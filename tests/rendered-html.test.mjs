@@ -49,6 +49,7 @@ test("keeps resume data private and supports the complete local workflow", async
   assert.match(page, /alineacv-resume-v1/);
   assert.match(page, /window\.localStorage/);
   assert.match(page, /window\.print\(\)/);
+  assert.doesNotMatch(page, /from "next\/link"|<Link/);
   assert.match(page, /type="file"/);
   assert.match(page, /classic.*photo-center.*photo-side/s);
   assert.match(page, /const experienceFirst = validExperience\.length > 0/);
@@ -94,6 +95,8 @@ test("server-renders the private ATS analyzer with route-specific metadata", asy
   const routeSource = await readFile(new URL("../app/api/improve-cv/route.ts", import.meta.url), "utf8");
   const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   assert.match(analyzerSource, /file\.arrayBuffer\(\)/);
+  assert.doesNotMatch(analyzerSource, /from "next\/link"|<Link/);
+  assert.match(analyzerSource, /<a href="\/">\{copy\.builderNav\}<\/a>/);
   assert.match(analyzerSource, /pdfjs-dist/);
   assert.match(analyzerSource, /GlobalWorkerOptions\.workerSrc = "\/pdf\.worker\.min\.mjs"/);
   assert.doesNotMatch(analyzerSource, /pdf\.worker\.min\.mjs\?url/);

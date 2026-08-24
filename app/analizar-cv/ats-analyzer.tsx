@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
-import Link from "next/link";
 import { analyzeResume } from "./analysis.mjs";
 import AiImprover from "./ai-improver";
 
@@ -227,14 +226,14 @@ export default function AtsAnalyzer() {
   return (
     <main className="ats-page">
       <header className="site-header">
-        <Link className="brand" href="/" aria-label="AlineaCV — Inicio">
+        <a className="brand" href="/" aria-label="AlineaCV — Inicio">
           <span className="brand-mark">A</span>
           <span>Alinea<span>CV</span></span>
-        </Link>
+        </a>
         <div className="header-actions">
           <nav className="header-nav" aria-label={language === "es" ? "Herramientas" : "Tools"}>
-            <Link href="/">{copy.builderNav}</Link>
-            <Link className="active" href="/analizar-cv">{copy.analyzerNav}</Link>
+            <a href="/">{copy.builderNav}</a>
+            <a className="active" href="/analizar-cv">{copy.analyzerNav}</a>
           </nav>
           <span className="privacy-note"><span>✓</span>{copy.privacy}</span>
           <div className="language-switcher" aria-label="Idioma / Language">
@@ -377,7 +376,7 @@ export default function AtsAnalyzer() {
 
               <div className="ats-result-actions">
                 <button type="button" onClick={reset}>{copy.another}</button>
-                <Link href="/">{copy.improve} →</Link>
+                <a href="/">{copy.improve} →</a>
               </div>
               <small className="ats-disclaimer">{copy.disclaimer}</small>
             </div>

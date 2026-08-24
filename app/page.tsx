@@ -3,7 +3,6 @@
 /* eslint-disable @next/next/no-img-element -- Resume photos are local data URLs and must never be sent to an image optimizer. */
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import Link from "next/link";
 
 type Language = "es" | "en";
 type SectionKey = "personal" | "education" | "experience" | "skills";
@@ -530,8 +529,8 @@ export default function Home() {
         </a>
         <div className="header-actions">
           <nav className="header-nav" aria-label={language === "es" ? "Herramientas" : "Tools"}>
-            <Link className="active" href="/">{copy.builderNav}</Link>
-            <Link href="/analizar-cv">{copy.analyzerNav}</Link>
+            <a className="active" href="/">{copy.builderNav}</a>
+            <a href="/analizar-cv">{copy.analyzerNav}</a>
           </nav>
           <span className="privacy-note"><span>✓</span>{copy.privacy}</span>
           <div className="language-switcher" aria-label="Idioma / Language">
