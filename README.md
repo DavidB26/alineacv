@@ -19,8 +19,8 @@ Creador bilingüe de currículums Harvard y ATS con vista previa en tiempo real,
 ## Desarrollo
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 La aplicación estará disponible en `http://localhost:3000`.
@@ -32,13 +32,14 @@ La revisión ATS básica funciona sin ninguna clave y se ejecuta en el navegador
 1. Crea una clave en `https://console.groq.com/keys`.
 2. Copia `.env.example` como `.env.local`.
 3. Añade la clave únicamente en `GROQ_API_KEY`.
-4. Reinicia el servidor de desarrollo.
+4. Si usas un dominio propio, define `NEXT_PUBLIC_SITE_URL` con su origen HTTPS. Las direcciones `workers.dev` y `pages.dev` de Cloudflare se detectan automáticamente.
+5. Reinicia el servidor de desarrollo.
 
 La clave se utiliza exclusivamente en la ruta del servidor y no se expone al navegador. Antes del envío, los datos de contacto e identificadores se sustituyen por marcadores que solo se restauran en el dispositivo. El modelo predeterminado es `openai/gpt-oss-120b`; puede cambiarse con `GROQ_MODEL`.
 
 ## Validación
 
 ```bash
-npm run build
-npm run lint
+pnpm build
+pnpm lint
 ```

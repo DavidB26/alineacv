@@ -21,6 +21,35 @@ async function render(pathname = "/", requestInit = {}, extraEnv = {}) {
   );
 }
 
+function createRateLimitDatabase() {
+  const counts = new Map();
+  return {
+    prepare(query) {
+      const statement = {
+        values: [],
+        bind(...values) {
+          this.values = values;
+          return this;
+        },
+        async first() {
+          if (!query.includes("INSERT INTO ai_rate_limits")) return null;
+          const key = this.values[0];
+          const count = (counts.get(key) ?? 0) + 1;
+          counts.set(key, count);
+          return { request_count: count };
+        },
+        async run() {
+          return { success: true };
+        },
+      };
+      return statement;
+    },
+    async batch() {
+      return [];
+    },
+  };
+}
+
 test("server-renders the AlineaCV editor and SEO metadata", async () => {
   const response = await render();
   assert.equal(response.status, 200);
@@ -334,7 +363,7 @@ EDUCACIÓN Universidad. HABILIDADES SEO, Analytics, React (Avanzado), SQL - Inte
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ resumeText: validResume, jobDescription: "Especialista de marketing", language: "es" }),
-    }, { GROQ_API_KEY: "test-key" });
+    }, { GROQ_API_KEY: "test-key", DB: createRateLimitDatabase() });
 
     assert.equal(response.status, 200);
     const responseBody = await response.json();

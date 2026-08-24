@@ -2,6 +2,19 @@ import { AI_RESUME_SCHEMA, type AiLanguage, type AiResumeResult } from "../../an
 
 const MAX_RESUME_CHARACTERS = 60_000;
 const MAX_JOB_CHARACTERS = 30_000;
+const RATE_LIMIT_WINDOW_SECONDS = 10 * 60;
+const RATE_LIMIT_MAX_REQUESTS = 5;
+
+type D1PreparedStatement = {
+  bind(...values: unknown[]): D1PreparedStatement;
+  first<T>(): Promise<T | null>;
+  run(): Promise<unknown>;
+};
+
+type D1Database = {
+  prepare(query: string): D1PreparedStatement;
+  batch(statements: D1PreparedStatement[]): Promise<unknown>;
+};
 
 const SYSTEM_INSTRUCTIONS = `You are AlineaCV, an expert bilingual resume editor and ATS reviewer.
 Analyze and rewrite the supplied resume in the requested interface language.
@@ -38,14 +51,67 @@ type RequestPayload = {
   language: AiLanguage;
 };
 
-function json(body: unknown, status = 200) {
+function json(body: unknown, status = 200, extraHeaders: HeadersInit = {}) {
   return Response.json(body, {
     status,
     headers: {
       "Cache-Control": "no-store",
       "Content-Type": "application/json; charset=utf-8",
+      ...Object.fromEntries(new Headers(extraHeaders)),
     },
   });
+}
+
+function runtimeDatabase() {
+  const runtime = globalThis as typeof globalThis & { __ALINEACV_ENV__?: Record<string, unknown> };
+  const database = runtime.__ALINEACV_ENV__?.DB;
+  return database && typeof database === "object" ? database as D1Database : null;
+}
+
+function clientAddress(request: Request) {
+  return request.headers.get("cf-connecting-ip")
+    ?? request.headers.get("x-real-ip")
+    ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    ?? "local-anonymous";
+}
+
+async function rateLimitKey(request: Request, bucket: number) {
+  const input = new TextEncoder().encode(`${clientAddress(request)}:${bucket}`);
+  const digest = await crypto.subtle.digest("SHA-256", input);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function consumeAiAllowance(request: Request) {
+  const database = runtimeDatabase();
+  if (!database) return { allowed: false, remaining: 0, retryAfter: 60, unavailable: true };
+
+  const now = Math.floor(Date.now() / 1000);
+  const bucket = Math.floor(now / RATE_LIMIT_WINDOW_SECONDS);
+  const resetAt = (bucket + 1) * RATE_LIMIT_WINDOW_SECONDS;
+  const key = await rateLimitKey(request, bucket);
+
+  await database.batch([
+    database.prepare("CREATE TABLE IF NOT EXISTS ai_rate_limits (key TEXT PRIMARY KEY NOT NULL, request_count INTEGER NOT NULL DEFAULT 1, expires_at INTEGER NOT NULL)"),
+    database.prepare("CREATE INDEX IF NOT EXISTS idx_ai_rate_limits_expires_at ON ai_rate_limits (expires_at)"),
+  ]);
+  const row = await database.prepare(`
+    INSERT INTO ai_rate_limits (key, request_count, expires_at)
+    VALUES (?, 1, ?)
+    ON CONFLICT(key) DO UPDATE SET request_count = request_count + 1
+    RETURNING request_count
+  `).bind(key, resetAt).first<{ request_count: number }>();
+
+  if (Math.random() < 0.02) {
+    await database.prepare("DELETE FROM ai_rate_limits WHERE expires_at < ?").bind(now).run();
+  }
+
+  const count = row?.request_count ?? RATE_LIMIT_MAX_REQUESTS + 1;
+  return {
+    allowed: count <= RATE_LIMIT_MAX_REQUESTS,
+    remaining: Math.max(0, RATE_LIMIT_MAX_REQUESTS - count),
+    retryAfter: Math.max(1, resetAt - now),
+    unavailable: false,
+  };
 }
 
 function runtimeValue(name: "GROQ_API_KEY" | "GROQ_MODEL") {
@@ -391,6 +457,21 @@ export async function POST(request: Request) {
 
   const apiKey = runtimeValue("GROQ_API_KEY");
   if (!apiKey) return json({ error: "La mejora con IA aún no está configurada.", code: "not_configured" }, 503);
+
+  let allowance: Awaited<ReturnType<typeof consumeAiAllowance>>;
+  try {
+    allowance = await consumeAiAllowance(request);
+  } catch {
+    return json({ error: "La mejora con IA no está disponible temporalmente.", code: "rate_limit_unavailable" }, 503);
+  }
+  if (!allowance.allowed) {
+    const code = allowance.unavailable ? "rate_limit_unavailable" : "rate_limit";
+    return json(
+      { error: "Has alcanzado el límite temporal de mejoras con IA.", code },
+      allowance.unavailable ? 503 : 429,
+      { "Retry-After": String(allowance.retryAfter), "X-RateLimit-Remaining": String(allowance.remaining) },
+    );
+  }
 
   const model = runtimeValue("GROQ_MODEL") || "openai/gpt-oss-120b";
   const protectedResume = redactSensitiveText(payload.resumeText);

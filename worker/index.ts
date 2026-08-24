@@ -3,6 +3,9 @@ import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } fr
 import handler from "vinext/server/app-router-entry";
 
 interface Env {
+  DB: {
+    prepare(query: string): unknown;
+  };
   GROQ_API_KEY?: string;
   GROQ_MODEL?: string;
   ASSETS: {
