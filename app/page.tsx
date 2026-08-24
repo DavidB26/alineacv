@@ -924,7 +924,7 @@ function CertificationItems({ items }: { items: Certification[] }) {
 
 function BulletText({ text }: { text: string }) {
   const lines = text.split(/\n+/).map((item) => item.replace(/^[•·\-–—]\s*/, "").trim()).filter(Boolean);
-  return <ul>{lines.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul>;
+  return <ul className="resume-bullets">{lines.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul>;
 }
 
 function initials(name: string) {

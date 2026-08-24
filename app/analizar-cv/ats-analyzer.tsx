@@ -62,7 +62,8 @@ const dictionary = {
       ["Coincidencia", "Comparamos tu CV con las palabras clave de una vacante."],
     ],
     disclaimer: "El puntaje es una guía de mejora. Cada empresa configura sus filtros de forma diferente.",
-    scoreLabel: "Puntaje ATS",
+    scoreLabel: "Índice de preparación",
+    scoreMethod: "Índice propio de AlineaCV calculado con 21 controles ponderados; no es una calificación emitida por una empresa o un ATS específico.",
     summary: "Resumen del análisis",
     changeTitle: "Cambios recomendados",
     strengthsTitle: "Lo que ya funciona",
@@ -137,7 +138,8 @@ const dictionary = {
       ["Job match", "We compare your resume against the keywords in a job description."],
     ],
     disclaimer: "The score is an improvement guide. Every company configures its screening tools differently.",
-    scoreLabel: "ATS score",
+    scoreLabel: "Readiness index",
+    scoreMethod: "AlineaCV's own index, calculated from 21 weighted checks; it is not a score issued by a company or a specific ATS.",
     summary: "Analysis summary",
     changeTitle: "Recommended changes",
     strengthsTitle: "What already works",
@@ -286,6 +288,7 @@ export default function AtsAnalyzer() {
   const analyzeLabel = result
     ? hasVacancy ? copy.reanalyzeAndAdapt : copy.reanalyze
     : hasVacancy ? copy.analyzeAndAdapt : copy.analyze;
+  const scoreColor = result && result.score < 50 ? "#e86b64" : result && result.score < 75 ? "#e1a43b" : "#2fc58b";
 
   return (
     <main className="ats-page">
@@ -417,14 +420,15 @@ export default function AtsAnalyzer() {
                   <div className="ats-report-layout">
                     <aside className="ats-report-sidebar">
                       <p>{copy.scoreLabel}</p>
-                      <div className="ats-score-ring" style={{ background: `conic-gradient(#41d69a ${result.score * 3.6}deg, #dce6ec 0deg)` }}>
+                      <div className="ats-score-ring" style={{ background: `conic-gradient(${scoreColor} ${result.score * 3.6}deg, #dce6ec 0deg)` }}>
                         <div><strong>{result.score}</strong><span>/100</span></div>
                       </div>
                       <h2>{result.verdict}</h2>
                       <span>{result.metrics.checkCount} {copy.completedChecks}</span>
+                      <small className="ats-score-method">{copy.scoreMethod}</small>
                       <nav aria-label={copy.summary}>
                         {result.auditGroups.map((group) => (
-                          <a href={`#audit-${group.id}`} key={group.id}>
+                          <a className={group.score >= 75 ? "good" : group.score >= 50 ? "review" : "priority"} href={`#audit-${group.id}`} key={group.id}>
                             <span>{group.label}<small>{group.issueCount} {copy.reviewChecks}</small></span>
                             <strong>{group.score}%</strong>
                           </a>
@@ -446,7 +450,7 @@ export default function AtsAnalyzer() {
 
                       <section className="ats-audit-groups" aria-label={copy.summary}>
                         {result.auditGroups.map((group, groupIndex) => (
-                          <details id={`audit-${group.id}`} open={groupIndex === 0} key={group.id}>
+                          <details className={group.score >= 75 ? "good" : group.score >= 50 ? "review" : "priority"} id={`audit-${group.id}`} open={groupIndex === 0} key={group.id}>
                             <summary><span><b>{group.label}</b><small>{group.checks.length} {copy.completedChecks} · {group.issueCount} {copy.reviewChecks}</small></span><strong>{group.score}%</strong></summary>
                             <div className="ats-audit-checks">
                               {group.checks.map((audit) => (

@@ -61,6 +61,7 @@ test("keeps resume data private and supports the complete local workflow", async
   assert.match(page, /const experienceFirst = validExperience\.length > 0/);
   assert.match(page, /experienceFirst[\s\S]*?\[experienceSection, educationSection\][\s\S]*?\[educationSection, experienceSection\]/);
   assert.match(page, /ResumeSection title=\{copy\.technicalSkills\} compact/);
+  assert.match(page, /className="resume-bullets"/);
   assert.match(page, /es:\s*\{/);
   assert.match(page, /en:\s*\{/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
@@ -90,8 +91,8 @@ test("server-renders the private ATS analyzer with route-specific metadata", asy
   const html = await response.text();
 
   assert.match(html, /<title>Analizador de CV ATS con IA \| AlineaCV<\/title>/i);
-  assert.match(html, /Descubre qué está frenando tu CV\./i);
-  assert.match(html, /PDF y DOCX/i);
+  assert.match(html, /Tu CV, revisado con evidencia\./i);
+  assert.match(html, /PDF (?:y|o) DOCX/i);
   assert.match(html, /El archivo se lee localmente; la IA solo recibe texto con tu permiso\./i);
   assert.match(html, /rel="canonical" href="http:\/\/localhost(?::3000)?\/analizar-cv"/i);
   assert.doesNotMatch(html, /property="og:image"/i);
@@ -123,6 +124,12 @@ test("server-renders the private ATS analyzer with route-specific metadata", asy
   assert.match(aiSource, /<RelatedJobs/);
   assert.match(aiSource, /Generar CV adaptado/);
   assert.match(analyzerSource, /Vista rápida de requisitos/);
+  assert.match(analyzerSource, /21 comprobaciones/);
+  assert.match(analyzerSource, /ats-landing-dropzone/);
+  assert.match(analyzerSource, /ats-report-layout/);
+  assert.match(analyzerSource, /result\.auditGroups\.map/);
+  assert.match(analyzerSource, /audit\.evidence/);
+  assert.match(analyzerSource, /copy\.checkStatus/);
   assert.match(aiSource, /Compatibilidad semántica con la vacante/);
   assert.match(analyzerSource, /onAdapt=\{adaptToJob\}/);
   assert.match(jobsSource, /fetch\(`\/api\/jobs\?/);
@@ -152,6 +159,10 @@ test("server-renders the private ATS analyzer with route-specific metadata", asy
   assert.match(routeSource, /removeUnsupportedNumbers/);
   assert.match(routeSource, /allowedNumericFacts/);
   assert.match(styles, /\.ats-workspace[\s\S]*?font-family:\s*var\(--font-ui\)/);
+  assert.match(styles, /\.ats-landing[\s\S]*?grid-template-columns/);
+  assert.match(styles, /\.ats-report-layout[\s\S]*?grid-template-columns/);
+  assert.match(styles, /\.ats-audit-checks article\.pass/);
+  assert.match(styles, /@media \(max-width:\s*720px\)[\s\S]*?\.ats-report-layout\s*\{[^}]*grid-template-columns:\s*1fr/);
   assert.match(styles, /\.ats-ai-resume pre[\s\S]*?font-size:\s*13\.5px/);
   assert.match(styles, /body\.alineacv-ai-printing[\s\S]*?\.ats-ai-print-document/);
   assert.match(styles, /\.editor-panel[\s\S]*?overflow-y:\s*auto/);
@@ -162,6 +173,7 @@ test("server-renders the private ATS analyzer with route-specific metadata", asy
   assert.match(styles, /\.related-jobs-grid[\s\S]*?grid-template-columns:\s*repeat\(2/);
   assert.match(styles, /@media \(max-width:\s*720px\)[\s\S]*?\.related-jobs-grid\s*\{[^}]*grid-template-columns:\s*1fr/);
   assert.match(styles, /\.resume-sheet\s*\{[\s\S]*?height:\s*auto[\s\S]*?overflow:\s*hidden/);
+  assert.match(styles, /\.resume-item ul\.resume-bullets[\s\S]*?list-style:\s*disc outside/);
   assert.doesNotMatch(styles, /\.resume-sheet\s*\{[\s\S]{0,180}?aspect-ratio/);
   await access(new URL("../public/pdf.worker.min.mjs", import.meta.url));
 });

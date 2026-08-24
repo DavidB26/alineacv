@@ -29,9 +29,14 @@ test("scores a structured, measurable resume above an incomplete one", () => {
   assert.ok(strong.score >= 80, `expected a strong score, received ${strong.score}`);
   assert.ok(weak.score < strong.score);
   assert.equal(strong.keywordMatch?.score, 100);
+  assert.equal(strong.metrics.checkCount, 21);
+  assert.equal(strong.auditGroups.length, 5);
+  assert.equal(strong.auditGroups.flatMap((group) => group.checks).length, 21);
+  assert.ok(strong.auditGroups.every((group) => group.checks.every((check) => check.evidence && check.recommendation)));
   assert.ok(strong.strengths.length >= 4);
   assert.ok(weak.issues.some((item) => item.id === "email" && item.severity === "critical"));
   assert.ok(weak.issues.some((item) => item.id === "skills"));
+  assert.ok(weak.auditGroups.flatMap((group) => group.checks).some((check) => check.status === "fail"));
 });
 
 test("returns bilingual recommendations without inventing a job match", () => {

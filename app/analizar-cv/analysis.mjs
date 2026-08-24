@@ -128,8 +128,12 @@ const SECTION_PATTERNS = {
 };
 
 const ACTION_VERBS = [
+  "aumentar", "alcanzar", "analizar", "automatizar", "construir", "coordinar", "crear", "desarrollar",
+  "disenar", "gestionar", "implementar", "liderar", "mejorar", "negociar", "optimizar", "reducir",
   "aumente", "alcance", "analice", "automatice", "construi", "coordine", "cree", "desarrolle",
   "disene", "gestione", "implemente", "lidere", "mejore", "negocie", "optimice", "reduje",
+  "increase", "achieve", "analyze", "automate", "build", "coordinate", "create", "develop",
+  "design", "grow", "implement", "improve", "lead", "manage", "optimize", "reduce",
   "increased", "achieved", "analyzed", "automated", "built", "coordinated", "created", "developed",
   "designed", "grew", "implemented", "improved", "led", "managed", "optimized", "reduced",
 ];
@@ -236,6 +240,10 @@ function auditStatus(pass, warning = false) {
   return pass ? "pass" : warning ? "warning" : "fail";
 }
 
+function hasActionVerb(value) {
+  return ACTION_VERBS.some((verb) => new RegExp(`\\b${verb}\\b`).test(value));
+}
+
 export function analyzeResume(sourceText, jobDescription = "", language = "es") {
   const text = sourceText.split(String.fromCharCode(0)).join(" ").replace(/[ \t]+/g, " ").trim();
   const plain = normalize(text);
@@ -251,7 +259,7 @@ export function analyzeResume(sourceText, jobDescription = "", language = "es") 
   const sections = Object.fromEntries(Object.entries(SECTION_PATTERNS).map(([key, pattern]) => [key, pattern.test(plain)]));
   const sectionCount = Object.values(sections).filter(Boolean).length;
   const dateCount = countMatches(plain, [/\b(?:19|20)\d{2}\b/g, /\b(?:ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic|jan|apr|aug|dec|actualidad|presente|present)\b/g]);
-  const actionCount = ACTION_VERBS.reduce((total, verb) => total + (plain.includes(verb) ? 1 : 0), 0);
+  const actionCount = ACTION_VERBS.reduce((total, verb) => total + (new RegExp(`\\b${verb}\\b`).test(plain) ? 1 : 0), 0);
   const metricCount = countMatches(plain, [/%/g, /[$€£]\s?\d/g, /\b\d+(?:[.,]\d+)?\s?(?:por ciento|percent|mil|k|millon|million|usuarios|users|clientes|clients|leads|ventas|sales|ingresos|revenue|ahorro|saved|horas|hours)\b/g]);
   const bulletCount = lines.filter((line) => /^[-•*▪‣]/.test(line)).length;
   const firstPersonCount = countMatches(plain, [/\b(?:yo|mio|mia|mi|i|my|mine)\b/g]);
@@ -264,7 +272,7 @@ export function analyzeResume(sourceText, jobDescription = "", language = "es") 
   const outcomeCount = countMatches(plain, [/\b(?:ahorro|crecimiento|conversion|eficiencia|impacto|mejora|reduccion|resultado|retencion|satisfaccion|saving|growth|conversion|efficiency|impact|improvement|reduction|result|retention|satisfaction)\w*\b/g]);
   const quantifiedActionCount = lines.filter((line) => {
     const normalizedLine = normalize(line);
-    return ACTION_VERBS.some((verb) => normalizedLine.includes(verb)) && /\d|%|[$€£]/.test(line);
+    return hasActionVerb(normalizedLine) && /\d|%|[$€£]/.test(line);
   }).length;
 
   const check = (id, group, weight, status, title, evidence, recommendation) => ({
