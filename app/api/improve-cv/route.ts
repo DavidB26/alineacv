@@ -17,6 +17,10 @@ Security and accuracy rules:
 - Improve wording, order, clarity, ATS structure, and keyword placement using only supported facts.
 - When a stronger statement needs a missing number or fact, add it to factsToVerify instead of fabricating it.
 - If no job description is supplied, infer only a broad target role from the resume and return empty missing-keyword claims that require a vacancy.
+- compatibility must work for any occupation, including design, finance, healthcare, education, sales, operations, and technology. Extract requirements from the supplied job description semantically; never rely on a fixed skills list.
+- compatibility.score must reflect only requirements supported by explicit evidence in resumeText. Weight mandatory responsibilities and qualifications more heavily than optional preferences. Do not reward a keyword when the resume does not support it.
+- compatibility.matchedRequirements and missingRequirements must use short human-readable requirement names from the vacancy. transferableStrengths may include only evidence-backed adjacent capabilities. If jobDescription is empty, use score 0 and empty compatibility arrays.
+- jobSearch.query must be a concise English job title suitable for a job-board search, even when the interface is Spanish. jobSearch.industry must be the closest available Jobicy category slug from the response schema.
 - The improved resume must be plain text, easy to scan, and use standard ATS section names.
 - Write each responsibility or achievement on its own line. Never combine several achievements into one paragraph.
 - For Spanish output, begin every experience line with an infinitive action verb such as Analizar, Diseñar, Implementar, Coordinar, Optimizar, or Liderar. Do not use first-person past-tense verbs.
@@ -112,6 +116,8 @@ function looksLikeResult(value: unknown): value is AiResumeResult {
     && typeof result.overallAssessment === "string"
     && typeof result.improvedResume === "string"
     && Array.isArray(result.recommendations)
+    && Boolean(result.compatibility)
+    && Boolean(result.jobSearch)
     && Boolean(result.builderData);
 }
 
@@ -196,7 +202,7 @@ function declaredSkillLevels(text: string) {
 
   for (const match of text.matchAll(matcher)) {
     const skill = match[1]
-      .replace(/^(?:habilidades(?:\s+t[eé]cnicas)?|technical skills|skills)\s*[:\-]?\s*/i, "")
+      .replace(/^(?:habilidades(?:\s+t[eé]cnicas)?|technical skills|skills)\s*[:-]?\s*/i, "")
       .trim()
       .replace(/[\s:–—-]+$/, "");
     const level = match[2].trim();

@@ -1,5 +1,32 @@
 export type AiLanguage = "es" | "en";
 
+export const JOB_INDUSTRIES = [
+  "admin-support",
+  "business",
+  "copywriting",
+  "design-multimedia",
+  "supporting",
+  "cybersecurity",
+  "data-science",
+  "admin",
+  "education",
+  "accounting-finance",
+  "healthcare",
+  "hr",
+  "legal",
+  "marketing",
+  "management",
+  "project-management",
+  "qa-testing",
+  "seller",
+  "seo",
+  "engineering",
+  "technical-support",
+  "web-app-design",
+] as const;
+
+export type JobIndustry = typeof JOB_INDUSTRIES[number];
+
 export type AiRecommendation = {
   section: string;
   priority: "high" | "medium" | "low";
@@ -55,6 +82,17 @@ export type AiResumeResult = {
     missing: string[];
     advice: string[];
   };
+  compatibility: {
+    score: number;
+    matchedRequirements: string[];
+    missingRequirements: string[];
+    transferableStrengths: string[];
+    explanation: string;
+  };
+  jobSearch: {
+    query: string;
+    industry: JobIndustry;
+  };
   improvedResume: string;
   factsToVerify: string[];
   builderData: BuilderResumeDraft;
@@ -94,6 +132,27 @@ export const AI_RESUME_SCHEMA = {
         advice: { type: "array", items: string },
       },
       required: ["matched", "missing", "advice"],
+    },
+    compatibility: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        score: { type: "integer", minimum: 0, maximum: 100 },
+        matchedRequirements: { type: "array", items: string },
+        missingRequirements: { type: "array", items: string },
+        transferableStrengths: { type: "array", items: string },
+        explanation: string,
+      },
+      required: ["score", "matchedRequirements", "missingRequirements", "transferableStrengths", "explanation"],
+    },
+    jobSearch: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        query: string,
+        industry: { type: "string", enum: JOB_INDUSTRIES },
+      },
+      required: ["query", "industry"],
     },
     improvedResume: string,
     factsToVerify: { type: "array", items: string },
@@ -172,5 +231,5 @@ export const AI_RESUME_SCHEMA = {
       required: ["personal", "education", "experience", "skills", "noExperience"],
     },
   },
-  required: ["headline", "overallAssessment", "targetRole", "recommendations", "keywords", "improvedResume", "factsToVerify", "builderData"],
+  required: ["headline", "overallAssessment", "targetRole", "recommendations", "keywords", "compatibility", "jobSearch", "improvedResume", "factsToVerify", "builderData"],
 } as const;

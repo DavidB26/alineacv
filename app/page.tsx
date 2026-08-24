@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element -- Resume photos are local data URLs and must never be sent to an image optimizer. */
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import HeaderNavigation from "./header-navigation";
 
 type Language = "es" | "en";
 type SectionKey = "personal" | "education" | "experience" | "skills";
@@ -65,6 +66,7 @@ const dictionary = {
     eyebrow: "Creador de CV gratuito",
     heroTitle: "Tu experiencia, bien alineada.",
     heroBody: "Crea un CV Harvard profesional, legible y preparado para procesos de selección.",
+    analyzerCta: "Revisar mi CV actual",
     privacy: "Tus datos se guardan solo en este dispositivo.",
     builderNav: "Crear CV",
     analyzerNav: "Analizar CV",
@@ -153,6 +155,7 @@ const dictionary = {
     eyebrow: "Free resume builder",
     heroTitle: "Your experience, properly aligned.",
     heroBody: "Create a professional, readable Harvard resume built for hiring processes.",
+    analyzerCta: "Check my current resume",
     privacy: "Your information is saved only on this device.",
     builderNav: "Build resume",
     analyzerNav: "Check resume",
@@ -528,10 +531,7 @@ export default function Home() {
           <span>Alinea<span>CV</span></span>
         </a>
         <div className="header-actions">
-          <nav className="header-nav" aria-label={language === "es" ? "Herramientas" : "Tools"}>
-            <a className="active" href="/">{copy.builderNav}</a>
-            <a href="/analizar-cv">{copy.analyzerNav}</a>
-          </nav>
+          <HeaderNavigation active="builder" language={language} />
           <span className="privacy-note"><span>✓</span>{copy.privacy}</span>
           <div className="language-switcher" aria-label="Idioma / Language">
             <button type="button" className={language === "es" ? "active" : ""} onClick={() => setLanguage("es")} aria-pressed={language === "es"}>ES</button>
@@ -545,6 +545,7 @@ export default function Home() {
           <p>{copy.eyebrow}</p>
           <h1>{copy.heroTitle}</h1>
           <span>{copy.heroBody}</span>
+          <a className="hero-analyzer-cta" href="/analizar-cv"><span>✓</span>{copy.analyzerCta} <b>→</b></a>
         </div>
         <div className="hero-badges" aria-label="Características">
           <span>ATS friendly</span>

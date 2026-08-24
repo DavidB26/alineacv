@@ -44,12 +44,18 @@ test("server-renders the AlineaCV editor and SEO metadata", async () => {
 
 test("keeps resume data private and supports the complete local workflow", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const headerNavigation = await readFile(new URL("../app/header-navigation.tsx", import.meta.url), "utf8");
   const packageJson = await readFile(new URL("../package.json", import.meta.url), "utf8");
 
   assert.match(page, /alineacv-resume-v1/);
   assert.match(page, /window\.localStorage/);
   assert.match(page, /window\.print\(\)/);
   assert.doesNotMatch(page, /from "next\/link"|<Link/);
+  assert.match(page, /<HeaderNavigation active="builder"/);
+  assert.match(headerNavigation, /aria-expanded=\{open\}/);
+  assert.match(headerNavigation, /mobile-menu-panel/);
+  assert.match(headerNavigation, /href="\/analizar-cv"/);
+  assert.doesNotMatch(headerNavigation, /from "next\/link"|<Link/);
   assert.match(page, /type="file"/);
   assert.match(page, /classic.*photo-center.*photo-side/s);
   assert.match(page, /const experienceFirst = validExperience\.length > 0/);
@@ -92,11 +98,13 @@ test("server-renders the private ATS analyzer with route-specific metadata", asy
 
   const analyzerSource = await readFile(new URL("../app/analizar-cv/ats-analyzer.tsx", import.meta.url), "utf8");
   const aiSource = await readFile(new URL("../app/analizar-cv/ai-improver.tsx", import.meta.url), "utf8");
+  const jobsSource = await readFile(new URL("../app/analizar-cv/related-jobs.tsx", import.meta.url), "utf8");
   const routeSource = await readFile(new URL("../app/api/improve-cv/route.ts", import.meta.url), "utf8");
+  const jobsRouteSource = await readFile(new URL("../app/api/jobs/route.ts", import.meta.url), "utf8");
   const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
   assert.match(analyzerSource, /file\.arrayBuffer\(\)/);
   assert.doesNotMatch(analyzerSource, /from "next\/link"|<Link/);
-  assert.match(analyzerSource, /<a href="\/">\{copy\.builderNav\}<\/a>/);
+  assert.match(analyzerSource, /<HeaderNavigation active="analyzer"/);
   assert.match(analyzerSource, /pdfjs-dist/);
   assert.match(analyzerSource, /GlobalWorkerOptions\.workerSrc = "\/pdf\.worker\.min\.mjs"/);
   assert.doesNotMatch(analyzerSource, /pdf\.worker\.min\.mjs\?url/);
@@ -112,11 +120,30 @@ test("server-renders the private ATS analyzer with route-specific metadata", asy
   assert.match(aiSource, /createPortal/);
   assert.match(aiSource, /window\.print\(\)/);
   assert.match(aiSource, /responsibilityLines/);
+  assert.match(aiSource, /<RelatedJobs/);
+  assert.match(aiSource, /Generar CV adaptado/);
+  assert.match(analyzerSource, /Vista rápida de requisitos/);
+  assert.match(aiSource, /Compatibilidad semántica con la vacante/);
+  assert.match(analyzerSource, /onAdapt=\{adaptToJob\}/);
+  assert.match(jobsSource, /fetch\(`\/api\/jobs\?/);
+  assert.match(jobsSource, /Adaptar mi CV/);
+  assert.match(jobsSource, /role="progressbar"/);
+  assert.match(jobsSource, /params\.set\("industry", industry\)/);
+  assert.match(jobsSource, /LinkedIn/);
+  assert.match(jobsSource, /Computrabajo/);
+  assert.match(jobsSource, /Bumeran/);
+  assert.match(jobsSource, /Vacantes remotas provistas por Jobicy/);
+  assert.match(jobsRouteSource, /https:\/\/jobicy\.com\/api\/v2\/remote-jobs/);
+  assert.match(jobsRouteSource, /cacheTtl:\s*3600/);
+  assert.match(jobsRouteSource, /compatibility/);
+  assert.doesNotMatch(jobsRouteSource, /GROQ_API_KEY|resumeText|fullName|email|phone/);
   assert.match(routeSource, /https:\/\/api\.groq\.com\/openai\/v1\/chat\/completions/);
   assert.match(routeSource, /redactSensitiveText/);
   assert.match(routeSource, /store:\s*false/);
   assert.match(routeSource, /type:\s*"json_schema"/);
   assert.match(routeSource, /Never invent employers/);
+  assert.match(routeSource, /compatibility must work for any occupation/);
+  assert.match(routeSource, /jobSearch\.query must be a concise English job title/);
   assert.match(routeSource, /infinitive action verb/);
   assert.match(routeSource, /Preserve every date exactly/);
   assert.match(routeSource, /Preserve every stated skill proficiency exactly/);
@@ -129,9 +156,102 @@ test("server-renders the private ATS analyzer with route-specific metadata", asy
   assert.match(styles, /body\.alineacv-ai-printing[\s\S]*?\.ats-ai-print-document/);
   assert.match(styles, /\.editor-panel[\s\S]*?overflow-y:\s*auto/);
   assert.match(styles, /--font-ui:\s*"Manrope"/);
+  assert.match(styles, /\.mobile-navigation\s*\{[^}]*display:\s*none/);
+  assert.match(styles, /@media \(max-width:\s*720px\)[\s\S]*?\.mobile-navigation\s*\{[^}]*display:\s*block/);
+  assert.match(styles, /\.mobile-menu-panel[\s\S]*?position:\s*absolute/);
+  assert.match(styles, /\.related-jobs-grid[\s\S]*?grid-template-columns:\s*repeat\(2/);
+  assert.match(styles, /@media \(max-width:\s*720px\)[\s\S]*?\.related-jobs-grid\s*\{[^}]*grid-template-columns:\s*1fr/);
   assert.match(styles, /\.resume-sheet\s*\{[\s\S]*?height:\s*auto[\s\S]*?overflow:\s*hidden/);
   assert.doesNotMatch(styles, /\.resume-sheet\s*\{[\s\S]{0,180}?aspect-ratio/);
   await access(new URL("../public/pdf.worker.min.mjs", import.meta.url));
+});
+
+test("returns ranked related jobs without sending the resume to the provider", async () => {
+  const originalFetch = globalThis.fetch;
+  const requestedUrls = [];
+  globalThis.fetch = async (url) => {
+    requestedUrls.push(String(url));
+    if (String(url).includes("get=industries")) {
+      return Response.json({ industries: [{ industryName: "Software Engineering", industrySlug: "engineering" }] });
+    }
+    return Response.json({ jobs: [
+      {
+        id: 1,
+        url: "https://jobicy.com/jobs/1-frontend-developer",
+        jobTitle: "Frontend Developer",
+        companyName: "Aster Labs",
+        jobIndustry: ["Software Engineering"],
+        jobType: ["Full-Time"],
+        jobGeo: "Anywhere",
+        jobLevel: "Midweight",
+        jobExcerpt: "Build React and TypeScript interfaces for a distributed product team.",
+        pubDate: "2026-08-24T10:00:00Z",
+      },
+      {
+        id: 2,
+        url: "https://jobicy.com/jobs/2-sales-manager",
+        jobTitle: "Sales Manager",
+        companyName: "North Co",
+        jobIndustry: ["Sales"],
+        jobType: ["Full-Time"],
+        jobGeo: "USA",
+        jobExcerpt: "Lead an enterprise sales team.",
+        pubDate: "2026-08-24T11:00:00Z",
+      },
+    ] });
+  };
+
+  try {
+    const response = await render("/api/jobs?role=Frontend%20Developer&industry=engineering&skills=React%2C%20TypeScript&location=Lima%2C%20Per%C3%BA");
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.equal(payload.jobs.length, 1);
+    assert.equal(payload.jobs[0].title, "Frontend Developer");
+    assert.deepEqual(payload.jobs[0].matches.slice(0, 2), ["frontend", "developer"]);
+    assert.deepEqual(payload.jobs[0].matchedSkills, ["React", "TypeScript"]);
+    assert.equal(payload.jobs[0].compatibility, 96);
+    assert.match(payload.jobs[0].description, /React and TypeScript/);
+    assert.deepEqual(requestedUrls, [
+      "https://jobicy.com/api/v2/remote-jobs?get=industries",
+      "https://jobicy.com/api/v2/remote-jobs?count=100&industry=engineering&tag=frontend",
+    ]);
+    assert.doesNotMatch(requestedUrls.join(" "), /Lima|React|TypeScript|resume|CV/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("ranks creative profiles through the current Jobicy industry taxonomy", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (String(url).includes("get=industries")) {
+      return Response.json({ industries: [{ industryName: "Creative & Design", industrySlug: "design-multimedia" }] });
+    }
+    return Response.json({ jobs: [{
+      id: 3,
+      url: "https://jobicy.com/jobs/3-product-designer",
+      jobTitle: "Product Designer",
+      companyName: "Canvas Studio",
+      jobIndustry: ["Creative & Design"],
+      jobType: ["Full-Time"],
+      jobGeo: "LATAM",
+      jobLevel: "Midweight",
+      jobDescription: "Create product experiences with Figma, prototyping and user research.",
+      pubDate: "2026-08-24T12:00:00Z",
+    }] });
+  };
+
+  try {
+    const response = await render("/api/jobs?role=Product%20Designer&industry=design-multimedia&skills=Figma%2C%20User%20Research&location=Lima%2C%20Per%C3%BA");
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.equal(payload.jobs.length, 1);
+    assert.equal(payload.jobs[0].title, "Product Designer");
+    assert.deepEqual(payload.jobs[0].matchedSkills, ["Figma", "User Research"]);
+    assert.equal(payload.jobs[0].compatibility, 96);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("protects the server-side AI improvement endpoint", async () => {
@@ -165,6 +285,14 @@ test("returns a structured AI improvement without uploading the original file", 
     targetRole: "Especialista de Marketing",
     recommendations: [],
     keywords: { matched: ["marketing"], missing: [], advice: [] },
+    compatibility: {
+      score: 82,
+      matchedRequirements: ["Marketing digital", "Analítica"],
+      missingRequirements: ["Automatización"],
+      transferableStrengths: ["Gestión de campañas"],
+      explanation: "El CV respalda la mayoría de requisitos prioritarios.",
+    },
+    jobSearch: { query: "Digital Marketing Specialist", industry: "marketing" },
     improvedResume: "CAMILA TORRES\n\nPERFIL PROFESIONAL\nEspecialista de marketing.",
     factsToVerify: [],
     builderData: {
@@ -208,6 +336,12 @@ EDUCACIÓN Universidad. HABILIDADES SEO, Analytics, React (Avanzado), SQL - Inte
     assert.equal(upstreamBody.max_completion_tokens, 3_600);
     assert.equal(upstreamBody.response_format.type, "json_schema");
     assert.equal(upstreamBody.response_format.json_schema.strict, true);
+    const aiSchema = upstreamBody.response_format.json_schema.schema;
+    assert.ok(aiSchema.required.includes("compatibility"));
+    assert.ok(aiSchema.required.includes("jobSearch"));
+    assert.ok(aiSchema.properties.jobSearch.properties.industry.enum.includes("design-multimedia"));
+    assert.ok(aiSchema.properties.jobSearch.properties.industry.enum.includes("accounting-finance"));
+    assert.ok(aiSchema.properties.jobSearch.properties.industry.enum.includes("healthcare"));
     assert.equal(upstreamBody.messages[0].role, "system");
     const protectedInput = upstreamBody.messages[1].content;
     assert.doesNotMatch(protectedInput, /Camila Torres|camila\.torres@email\.com|987 654 321|camilatorres/);

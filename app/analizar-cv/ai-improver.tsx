@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { AiLanguage, AiResumeResult, BuilderResumeDraft } from "./ai-result";
+import RelatedJobs from "./related-jobs";
 
 type Status = "idle" | "loading" | "success" | "error";
 type Tab = "diagnosis" | "resume";
@@ -12,11 +13,14 @@ const dictionary = {
     eyebrow: "Mejora con IA",
     title: "Convierte el diagnóstico en un CV más fuerte.",
     body: "La IA revisará el contexto completo, reescribirá cada sección y preparará una versión lista para editar.",
+    tailoredTitle: "Adapta tu CV a esta vacante.",
+    tailoredBody: "La IA contrastará los requisitos con tu experiencia y preparará una versión enfocada, sin inventar datos.",
     badgePrivate: "Datos de contacto protegidos",
     badgeFacts: "Sin inventar datos",
     consent: "Acepto enviar temporalmente a Groq una versión protegida del texto de mi CV y la vacante para generar la mejora.",
     privacy: "Antes del envío, nombre, correo, teléfono, enlaces e identificadores se reemplazan localmente. El PDF nunca se envía.",
     generate: "Generar versión mejorada",
+    generateTailored: "Generar CV adaptado",
     loading: "Revisando estructura, logros y palabras clave…",
     diagnosis: "Cambios con IA",
     resume: "CV mejorado",
@@ -28,6 +32,11 @@ const dictionary = {
     keywordTitle: "Estrategia de palabras clave",
     matched: "Ya presentes",
     missing: "Por incorporar",
+    compatibilityTitle: "Compatibilidad semántica con la vacante",
+    compatibilityMatched: "Requisitos respaldados",
+    compatibilityMissing: "Brechas reales",
+    compatibilityTransferable: "Fortalezas transferibles",
+    compatibilityNote: "Estimación basada en evidencia del CV y requisitos de la oferta; no garantiza selección.",
     verify: "Datos que debes confirmar",
     copy: "Copiar texto",
     copied: "Copiado",
@@ -46,11 +55,14 @@ const dictionary = {
     eyebrow: "AI improvement",
     title: "Turn the diagnosis into a stronger resume.",
     body: "AI will review the full context, rewrite each section and prepare an editable version.",
+    tailoredTitle: "Tailor your resume to this job.",
+    tailoredBody: "AI will compare the requirements with your experience and prepare a focused version without inventing facts.",
     badgePrivate: "Contact details protected",
     badgeFacts: "No invented facts",
     consent: "I agree to temporarily send Groq a protected version of my resume text and job description to generate the improvement.",
     privacy: "Before sending, name, email, phone, links and identifiers are replaced locally. The PDF is never uploaded.",
     generate: "Generate improved version",
+    generateTailored: "Generate tailored resume",
     loading: "Reviewing structure, achievements and keywords…",
     diagnosis: "AI changes",
     resume: "Improved resume",
@@ -62,6 +74,11 @@ const dictionary = {
     keywordTitle: "Keyword strategy",
     matched: "Already present",
     missing: "Consider adding",
+    compatibilityTitle: "Semantic compatibility with the job",
+    compatibilityMatched: "Supported requirements",
+    compatibilityMissing: "Actual gaps",
+    compatibilityTransferable: "Transferable strengths",
+    compatibilityNote: "Estimate based on resume evidence and job requirements; it does not guarantee selection.",
     verify: "Facts to verify",
     copy: "Copy text",
     copied: "Copied",
@@ -159,7 +176,17 @@ function createBuilderResume(draft: BuilderResumeDraft) {
   };
 }
 
-export default function AiImprover({ resumeText, jobDescription, language }: { resumeText: string; jobDescription: string; language: AiLanguage }) {
+export default function AiImprover({
+  resumeText,
+  jobDescription,
+  language,
+  onAdapt,
+}: {
+  resumeText: string;
+  jobDescription: string;
+  language: AiLanguage;
+  onAdapt: (description: string, title: string) => void;
+}) {
   const [status, setStatus] = useState<Status>("idle");
   const [consent, setConsent] = useState(false);
   const [result, setResult] = useState<AiResumeResult | null>(null);
@@ -168,6 +195,7 @@ export default function AiImprover({ resumeText, jobDescription, language }: { r
   const [copied, setCopied] = useState(false);
   const [printing, setPrinting] = useState(false);
   const copy = dictionary[language];
+  const hasVacancy = jobDescription.trim().length > 0;
 
   useEffect(() => {
     if (!printing || !result) return;
@@ -251,12 +279,12 @@ export default function AiImprover({ resumeText, jobDescription, language }: { r
         : copy.errors.generic;
 
   return (
-    <section className="ats-ai-section">
+    <section className="ats-ai-section" id="ats-ai-improver">
       <div className="ats-ai-heading">
         <div>
           <p>{copy.eyebrow}</p>
-          <h3>{copy.title}</h3>
-          <span>{copy.body}</span>
+          <h3>{hasVacancy ? copy.tailoredTitle : copy.title}</h3>
+          <span>{hasVacancy ? copy.tailoredBody : copy.body}</span>
         </div>
         <div className="ats-ai-badges"><span>✓ {copy.badgePrivate}</span><span>✓ {copy.badgeFacts}</span></div>
       </div>
@@ -269,7 +297,7 @@ export default function AiImprover({ resumeText, jobDescription, language }: { r
           </label>
           <p>{copy.privacy}</p>
           <button type="button" disabled={!consent || status === "loading"} onClick={generateImprovement}>
-            {status === "loading" ? copy.loading : status === "error" ? copy.retry : copy.generate}
+            {status === "loading" ? copy.loading : status === "error" ? copy.retry : hasVacancy ? copy.generateTailored : copy.generate}
             <span aria-hidden="true">{status === "loading" ? "…" : "→"}</span>
           </button>
           {status === "error" && <div className="ats-ai-error" role="alert">{error}</div>}
@@ -290,6 +318,22 @@ export default function AiImprover({ resumeText, jobDescription, language }: { r
                 <h4>{result.headline}</h4>
                 <p>{result.overallAssessment}</p>
               </div>
+              {hasVacancy && <section className="ats-ai-compatibility">
+                <header>
+                  <h4>{copy.compatibilityTitle}</h4>
+                  <strong>{result.compatibility.score}%</strong>
+                </header>
+                <div className="ats-ai-compatibility-bar" role="progressbar" aria-label={`${copy.compatibilityTitle}: ${result.compatibility.score}%`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={result.compatibility.score}>
+                  <i style={{ width: `${result.compatibility.score}%` }} />
+                </div>
+                {result.compatibility.explanation && <p>{result.compatibility.explanation}</p>}
+                <div className="ats-ai-compatibility-groups">
+                  <article><span>{copy.compatibilityMatched}</span><p>{result.compatibility.matchedRequirements.join(", ") || "—"}</p></article>
+                  <article><span>{copy.compatibilityMissing}</span><p>{result.compatibility.missingRequirements.join(", ") || "—"}</p></article>
+                  {result.compatibility.transferableStrengths.length > 0 && <article><span>{copy.compatibilityTransferable}</span><p>{result.compatibility.transferableStrengths.join(", ")}</p></article>}
+                </div>
+                <small>{copy.compatibilityNote}</small>
+              </section>}
               <div className="ats-ai-recommendations">
                 {result.recommendations.map((item, index) => (
                   <article key={`${item.section}-${index}`}>
@@ -324,6 +368,14 @@ export default function AiImprover({ resumeText, jobDescription, language }: { r
               </div>
             </div>
           )}
+          <RelatedJobs
+            role={result.jobSearch?.query || result.targetRole || result.builderData.personal.role}
+            industry={result.jobSearch?.industry || ""}
+            skills={result.builderData.skills.technical}
+            location={result.builderData.personal.location}
+            language={language}
+            onAdapt={onAdapt}
+          />
         </div>
       )}
       {printing && result && typeof document !== "undefined" && createPortal(

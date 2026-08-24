@@ -41,3 +41,14 @@ test("returns bilingual recommendations without inventing a job match", () => {
   assert.equal(result.verdict, "High priority");
   assert.ok(result.issues.some((item) => item.title === "No detectable email"));
 });
+
+test("compares concrete job requirements instead of advertisement filler words", () => {
+  const resume = "HABILIDADES JavaScript, React y HTML. EXPERIENCIA PROFESIONAL Desarrollador frontend.";
+  const vacancy = "Si dominas JavaScript, React y HTML, tienes experiencia consumiendo APIs REST, este puede ser tu lugar.";
+  const result = analyzeResume(resume, vacancy, "es");
+
+  assert.deepEqual(result.keywordMatch?.matched, ["JavaScript", "React", "HTML"]);
+  assert.deepEqual(result.keywordMatch?.missing, ["API", "REST"]);
+  assert.equal(result.keywordMatch?.score, 60);
+  assert.doesNotMatch(JSON.stringify(result.keywordMatch), /consumiendo|dominas|tienes|lugar/i);
+});
