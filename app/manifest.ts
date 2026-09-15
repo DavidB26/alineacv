@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "AlineaCV — Creador de CV Harvard y ATS",
+    name: "AlineaCV — Analizador de CV ATS",
     short_name: "AlineaCV",
-    description: "Crea un CV Harvard profesional, legible y compatible con ATS de forma gratuita.",
+    description: "Analiza tu CV con una convocatoria o un puesto y recibe recomendaciones para mejorarlo.",
     start_url: "/",
     display: "standalone",
     background_color: "#f8fafb",

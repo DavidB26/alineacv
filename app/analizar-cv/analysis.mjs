@@ -213,6 +213,14 @@ function hasTerm(value, term) {
   return new RegExp(`(^|[^a-z0-9+#.])${escaped}(?=$|[^a-z0-9+#.])`).test(haystack);
 }
 
+export function resumeSearchSkills(value) {
+  return REQUIREMENT_GROUPS
+    .filter(([, aliases]) => aliases.some((alias) => hasTerm(value, alias)))
+    .map(([label]) => label)
+    .join(", ")
+    .slice(0, 500);
+}
+
 function keywordList(value) {
   const normalizedValue = normalize(value);
   const requirements = REQUIREMENT_GROUPS
@@ -244,7 +252,7 @@ function hasActionVerb(value) {
   return ACTION_VERBS.some((verb) => new RegExp(`\\b${verb}\\b`).test(value));
 }
 
-export function analyzeResume(sourceText, jobDescription = "", language = "es") {
+export function analyzeResume(sourceText, jobDescription = "", language = "es", targetMode = "vacancy") {
   const text = sourceText.split(String.fromCharCode(0)).join(" ").replace(/[ \t]+/g, " ").trim();
   const plain = normalize(text);
   const words = (plain.match(/[a-z0-9+#.-]+/g) ?? []).map((word) => word.replace(/^[.-]+|[.-]+$/g, "")).filter(Boolean);
@@ -397,7 +405,7 @@ export function analyzeResume(sourceText, jobDescription = "", language = "es") 
       checks,
     };
   });
-  const score = Math.max(0, Math.min(100, Math.round(auditChecks.reduce((total, item) => total + item.points, 0))));
+  const atsQualityScore = Math.max(0, Math.min(100, Math.round(auditChecks.reduce((total, item) => total + item.points, 0))));
 
   const issues = [];
   if (!hasEmail) issues.push(issue(language, "email", "critical"));
@@ -423,18 +431,30 @@ export function analyzeResume(sourceText, jobDescription = "", language = "es") 
   if (actionCount >= 3) strengths.push(copy[language].strengths.verbs);
   if (wordCount >= 250 && wordCount <= 900) strengths.push(copy[language].strengths.length);
 
-  const jobKeywords = keywordList(jobDescription);
+  // A title names an objective, not the requirements of a specific employer.
+  const jobKeywords = targetMode === "role" ? [] : keywordList(jobDescription);
   const matchedRequirements = jobKeywords.filter((requirement) => requirement.aliases.some((alias) => hasTerm(plain, alias)));
   const matched = matchedRequirements.map((requirement) => requirement.label);
   const missing = jobKeywords.filter((requirement) => !matchedRequirements.includes(requirement)).map((requirement) => requirement.label);
   const matchScore = jobKeywords.length ? Math.round((matched.length / jobKeywords.length) * 100) : null;
   if (matchScore !== null && matchScore >= 70) strengths.push(copy[language].strengths.match);
 
-  const verdictIndex = score >= 80 ? 3 : score >= 65 ? 2 : score >= 50 ? 1 : 0;
+  // Job matching stays separate from the document-quality checks. A missing
+  // vacancy or unrecognized requirements must never produce a generic match.
+  const score = matchScore;
+  const verdict = score === null
+    ? localized(language, "Sin coincidencia calculable", "No measurable keyword match")
+    : localized(language,
+      score >= 80 ? "Alta coincidencia de palabras clave" : score >= 50 ? "Coincidencia parcial de palabras clave" : "Baja coincidencia de palabras clave",
+      score >= 80 ? "High keyword match" : score >= 50 ? "Partial keyword match" : "Low keyword match");
 
   return {
+    targetMode,
+    targetRole: targetMode === "role" ? jobDescription.trim() : "",
+    resumeSkills: resumeSearchSkills(text),
     score,
-    verdict: copy[language].verdicts[verdictIndex],
+    atsQualityScore,
+    verdict,
     categories: auditGroups.map(({ label, score: categoryScore, maximum }) => ({ label, score: categoryScore, maximum })),
     auditGroups,
     issues,

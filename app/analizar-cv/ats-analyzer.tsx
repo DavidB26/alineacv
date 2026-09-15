@@ -2,28 +2,30 @@
 
 /* eslint-disable @next/next/no-html-link-for-pages -- Native anchors avoid vinext beta client-navigation failures in production. */
 
-import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { analyzeResume } from "./analysis.mjs";
-import AiImprover from "./ai-improver";
-import HeaderNavigation from "../header-navigation";
+import AtsReport from "./ats-report";
 
 type Language = "es" | "en";
+type TargetMode = "vacancy" | "role";
 type Status = "idle" | "reading" | "analyzing" | "ready" | "error";
 
 const dictionary = {
   es: {
-    privacy: "El archivo se lee localmente; la IA solo recibe texto con tu permiso.",
+    privacy: "Tu CV y la vacante se analizan en este dispositivo.",
     builderNav: "Crear CV",
     analyzerNav: "Analizar CV",
     eyebrow: "Analizador ATS gratuito",
-    title: "Tu CV, revisado con evidencia.",
-    intro: "Más de 20 comprobaciones trazables para entender qué puede leer un ATS y qué necesita mejorar un reclutador.",
-    badges: ["21 comprobaciones", "100% privado", "Sin registro"],
-    landingLead: "Sube tu CV y recibe un informe claro, criterio por criterio. Si añades una vacante, también podrás adaptarlo con IA sin inventar datos.",
+    title: "Acerca tu CV al puesto que buscas.",
+    intro: "Sube tu CV y añade la convocatoria o el puesto. Descubre qué mejorar antes de postular.",
+    badges: ["PDF y Word", "Análisis en tu dispositivo", "Sin registro"],
+    landingLead: "Sube tu CV y pega la descripción de la vacante. Revisaremos sus coincidencias y la calidad del documento, criterio por criterio.",
     landingPrivacy: "Tu PDF nunca sale de este dispositivo durante el análisis local.",
     previewEyebrow: "Vista del informe",
     previewTitle: "No solo una nota: sabrás por qué.",
     previewProblems: "puntos por revisar",
+    previewPending: "CV + vacante",
+    vacancyRequired: "Añade la descripción de la vacante para analizar.",
     previewChecks: ["Lectura ATS", "Secciones", "Contenido y claridad", "Impacto", "Contacto"],
     uploadTitle: "Sube tu CV",
     uploadHelp: "PDF o DOCX con texto seleccionable. Máximo 10 MB.",
@@ -35,10 +37,10 @@ const dictionary = {
     reading: "Leyendo el contenido…",
     ready: "Listo para analizar",
     words: "palabras detectadas",
-    vacancyLabel: "¿Ya tienes una oferta? Pega la descripción",
-    vacancyHelp: "Calcularemos la compatibilidad y podremos preparar una versión de tu CV adaptada a sus requisitos.",
+    vacancyLabel: "Descripción de la vacante (obligatoria)",
+    vacancyHelp: "Pega la descripción completa, incluyendo funciones y requisitos. Necesitamos una vacante para comparar tu CV.",
     vacancyPlaceholder: "Ej. Buscamos analista de datos con experiencia en SQL, Power BI, Python…",
-    vacancyReady: "Oferta detectada: revisaremos sus requisitos y podrás obtener compatibilidad semántica con IA.",
+    vacancyReady: "Vacante añadida: ya podemos comparar sus palabras clave con tu CV.",
     analyze: "Analizar mi CV",
     analyzeAndAdapt: "Analizar CV y oferta",
     reanalyze: "Actualizar análisis",
@@ -62,8 +64,10 @@ const dictionary = {
       ["Coincidencia", "Comparamos tu CV con las palabras clave de una vacante."],
     ],
     disclaimer: "El puntaje es una guía de mejora. Cada empresa configura sus filtros de forma diferente.",
-    scoreLabel: "Índice de preparación",
-    scoreMethod: "Índice propio de AlineaCV calculado con 21 controles ponderados; no es una calificación emitida por una empresa o un ATS específico.",
+    scoreLabel: "Coincidencia con la vacante",
+    scoreLabelJob: "Coincidencia de palabras clave",
+    scoreMethod: "No identificamos requisitos concretos en esta descripción. Amplíala para calcular la coincidencia; las comprobaciones del documento siguen disponibles.",
+    scoreMethodJob: "Porcentaje de palabras clave detectadas en la vacante que también aparecen en tu CV. No evalúa todos los requisitos, niveles ni años de experiencia, y no predice si pasarás un ATS. La calidad del documento se revisa por separado.",
     summary: "Resumen del análisis",
     changeTitle: "Cambios recomendados",
     strengthsTitle: "Lo que ya funciona",
@@ -72,7 +76,7 @@ const dictionary = {
     critical: "Prioritario",
     warning: "Mejora",
     keywordTitle: "Vista rápida de requisitos",
-    keywordHelp: "Esta detección ocurre en tu dispositivo. La compatibilidad general por contexto aparece en la revisión con IA.",
+    keywordHelp: "Esta comparación busca términos y equivalencias conocidas en tu dispositivo. Encontrar una palabra no demuestra por sí solo que cumples el requisito.",
     matched: "Encontrados en tu CV",
     missing: "No encontrados",
     keywordEmpty: "Añade una descripción de empleo para ver las palabras clave coincidentes y faltantes.",
@@ -88,18 +92,20 @@ const dictionary = {
     },
   },
   en: {
-    privacy: "The file is read locally; AI only receives text with your permission.",
+    privacy: "Your resume and job description are analyzed on this device.",
     builderNav: "Build resume",
     analyzerNav: "Check resume",
     eyebrow: "Free ATS resume checker",
-    title: "Your resume, reviewed with evidence.",
-    intro: "More than 20 traceable checks to understand what an ATS can read and what a recruiter still needs.",
-    badges: ["21 traceable checks", "100% private", "No account"],
-    landingLead: "Upload your resume and receive a clear, check-by-check report. Add a job to tailor it with AI without inventing facts.",
+    title: "Bring your resume closer to your next role.",
+    intro: "Upload your resume and add a job description or role. Find out what to improve before applying.",
+    badges: ["PDF and Word", "On-device analysis", "No account"],
+    landingLead: "Upload your resume and paste the job description. We will review keyword matches and document quality, check by check.",
     landingPrivacy: "Your PDF never leaves this device during the local analysis.",
     previewEyebrow: "Report preview",
     previewTitle: "Not just a score: you will know why.",
     previewProblems: "items to review",
+    previewPending: "Resume + job",
+    vacancyRequired: "Add the job description to run the analysis.",
     previewChecks: ["ATS parsing", "Sections", "Content and clarity", "Impact", "Contact"],
     uploadTitle: "Upload your resume",
     uploadHelp: "Text-based PDF or DOCX. 10 MB maximum.",
@@ -111,10 +117,10 @@ const dictionary = {
     reading: "Reading content…",
     ready: "Ready to analyze",
     words: "words detected",
-    vacancyLabel: "Already have a job offer? Paste the description",
-    vacancyHelp: "We will calculate compatibility and can prepare a resume version tailored to its requirements.",
+    vacancyLabel: "Job description (required)",
+    vacancyHelp: "Paste the full description, including duties and requirements. A job description is needed to compare your resume.",
     vacancyPlaceholder: "e.g. We are looking for a data analyst with SQL, Power BI and Python experience…",
-    vacancyReady: "Job detected: we will review its requirements and you can get semantic AI compatibility.",
+    vacancyReady: "Job description added: we can now compare its keywords with your resume.",
     analyze: "Analyze my resume",
     analyzeAndAdapt: "Analyze resume and job",
     reanalyze: "Update analysis",
@@ -138,8 +144,10 @@ const dictionary = {
       ["Job match", "We compare your resume against the keywords in a job description."],
     ],
     disclaimer: "The score is an improvement guide. Every company configures its screening tools differently.",
-    scoreLabel: "Readiness index",
-    scoreMethod: "AlineaCV's own index, calculated from 21 weighted checks; it is not a score issued by a company or a specific ATS.",
+    scoreLabel: "Match against the job",
+    scoreLabelJob: "Keyword match",
+    scoreMethod: "We could not identify concrete requirements in this description. Add detail to calculate the match; document checks remain available.",
+    scoreMethodJob: "Percentage of detected job keywords also found in your resume. It does not assess every requirement, proficiency level or year of experience, and does not predict passing an ATS. Document quality is reviewed separately.",
     summary: "Analysis summary",
     changeTitle: "Recommended changes",
     strengthsTitle: "What already works",
@@ -148,7 +156,7 @@ const dictionary = {
     critical: "Priority",
     warning: "Improve",
     keywordTitle: "Quick requirement preview",
-    keywordHelp: "This detection runs on your device. The general context-aware compatibility appears in the AI review.",
+    keywordHelp: "This comparison looks for terms and known equivalents on your device. Finding a word alone does not prove that you meet the requirement.",
     matched: "Found in your resume",
     missing: "Not found",
     keywordEmpty: "Add a job description to see matched and missing keywords.",
@@ -169,16 +177,18 @@ async function extractPdf(file: File) {
   const pdfjs = await import("pdfjs-dist");
   pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
   const loadingTask = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) });
-  const document = await loadingTask.promise;
-  const pages: string[] = [];
-
-  for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
-    const page = await document.getPage(pageNumber);
-    const content = await page.getTextContent();
-    pages.push(content.items.map((item) => ("str" in item ? `${item.str}${item.hasEOL ? "\n" : " "}` : "")).join(""));
+  try {
+    const document = await loadingTask.promise;
+    const pages: string[] = [];
+    for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+      const page = await document.getPage(pageNumber);
+      const content = await page.getTextContent();
+      pages.push(content.items.map((item) => ("str" in item ? `${item.str}${item.hasEOL ? "\n" : " "}` : "")).join(""));
+    }
+    return pages.join("\n\n");
+  } finally {
+    await loadingTask.destroy();
   }
-
-  return pages.join("\n\n");
 }
 
 async function extractDocx(file: File) {
@@ -192,20 +202,32 @@ function isSupported(file: File) {
   return extension === "pdf" || extension === "docx";
 }
 
+function vacancyLabel(description: string, language: Language) {
+  const lines = description.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  const labeledLine = lines.find((line) => /^(puesto|cargo|posición|position|role|job title)\s*:/i.test(line));
+  const explicitTitle = labeledLine?.replace(/^[^:]+:\s*/, "").trim();
+  const firstLine = lines[0]?.length <= 80 ? lines[0] : "";
+  return explicitTitle || firstLine || (language === "es" ? "Convocatoria cargada" : "Job description added");
+}
+
 export default function AtsAnalyzer() {
   const [language, setLanguage] = useState<Language>("es");
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [resumeText, setResumeText] = useState("");
   const [jobDescription, setJobDescription] = useState("");
+  const [targetMode, setTargetMode] = useState<TargetMode>("vacancy");
+  const [targetRole, setTargetRole] = useState("");
+  const readVersion = useRef(0);
+  const targetText = targetMode === "vacancy" ? jobDescription : targetRole;
   const [result, setResult] = useState<ReturnType<typeof analyzeResume> | null>(null);
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
-  const [scanStage, setScanStage] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const copy = dictionary[language];
 
   async function readFile(nextFile: File) {
+    const version = ++readVersion.current;
     setError("");
     setResult(null);
     setResumeText("");
@@ -228,11 +250,14 @@ export default function AtsAnalyzer() {
     try {
       const extension = nextFile.name.split(".").pop()?.toLowerCase();
       const extracted = extension === "pdf" ? await extractPdf(nextFile) : await extractDocx(nextFile);
+      if (version !== readVersion.current) return;
       const cleaned = extracted.split(String.fromCharCode(0)).join(" ").replace(/[ \t]+/g, " ").trim();
       if (cleaned.split(/\s+/).length < 40) throw new Error("empty");
       setResumeText(cleaned);
       setStatus("ready");
     } catch (readError) {
+      if (version !== readVersion.current) return;
+      setFile(null);
       setStatus("error");
       setError(readError instanceof Error && readError.message === "empty" ? copy.errors.empty : copy.errors.generic);
     }
@@ -252,262 +277,107 @@ export default function AtsAnalyzer() {
   }
 
   async function runAnalysis() {
-    if (!resumeText) return;
+    if (status !== "ready" || !resumeText || !targetText.trim()) return;
+    const version = readVersion.current;
     setStatus("analyzing");
-    setScanStage(1);
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    const nextResult = analyzeResume(resumeText, jobDescription, language);
-    setScanStage(copy.analysisStages.length);
-    setResult(nextResult);
+    if (version !== readVersion.current) return;
+    setResult(analyzeResume(resumeText, targetText, language, targetMode));
     setStatus("ready");
   }
 
-  function adaptToJob(description: string) {
-    if (!resumeText) return;
+  function updateVacancy(description: string) {
     setJobDescription(description);
-    setResult(analyzeResume(resumeText, description, language));
-    window.setTimeout(() => document.getElementById("ats-ai-improver")?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+    setResult(null);
   }
 
   function reset() {
+    readVersion.current += 1;
     setFile(null);
     setStatus("idle");
     setResumeText("");
     setResult(null);
     setError("");
-    setScanStage(0);
   }
 
   function changeLanguage(nextLanguage: Language) {
     setLanguage(nextLanguage);
-    if (resumeText && result) setResult(analyzeResume(resumeText, jobDescription, nextLanguage));
+    if (resumeText && result) setResult(analyzeResume(resumeText, targetText, nextLanguage, targetMode));
   }
 
   const wordCount = resumeText ? resumeText.split(/\s+/).filter(Boolean).length : 0;
-  const hasVacancy = jobDescription.trim().length > 0;
-  const analyzeLabel = result
-    ? hasVacancy ? copy.reanalyzeAndAdapt : copy.reanalyze
-    : hasVacancy ? copy.analyzeAndAdapt : copy.analyze;
-  const scoreColor = result && result.score < 50 ? "#e86b64" : result && result.score < 75 ? "#e1a43b" : "#2fc58b";
+  const es = language === "es";
+  const hasTarget = targetText.trim().length > 0;
+  const targetLabel = targetMode === "role" ? targetRole.trim() : vacancyLabel(jobDescription, language);
+
+  useEffect(() => {
+    if (!result) return;
+    const report = document.getElementById("ats-result-summary");
+    report?.focus({ preventScroll: true });
+    report?.scrollIntoView({ block: "start" });
+  }, [result]);
+
 
   return (
-    <main className="ats-page">
+    <main className="ats-page ats-single-page" lang={language}>
       <header className="site-header">
         <a className="brand" href="/" aria-label="AlineaCV — Inicio">
-          <span className="brand-mark">A</span>
-          <span>Alinea<span>CV</span></span>
+          <span className="brand-mark">A</span><span>Alinea<span>CV</span></span>
         </a>
         <div className="header-actions">
-          <HeaderNavigation active="analyzer" language={language} />
-          <span className="privacy-note"><span>✓</span>{copy.privacy}</span>
+          <span className="privacy-note"><span>✓</span>{es ? "Tu CV se queda contigo" : "Your resume stays with you"}</span>
           <div className="language-switcher" aria-label="Idioma / Language">
-            <button type="button" className={language === "es" ? "active" : ""} onClick={() => changeLanguage("es")} aria-pressed={language === "es"}>ES</button>
-            <button type="button" className={language === "en" ? "active" : ""} onClick={() => changeLanguage("en")} aria-pressed={language === "en"}>EN</button>
+            <button type="button" disabled={status === "analyzing"} className={es ? "active" : ""} onClick={() => changeLanguage("es")} aria-pressed={es}>ES</button>
+            <button type="button" disabled={status === "analyzing"} className={!es ? "active" : ""} onClick={() => changeLanguage("en")} aria-pressed={!es}>EN</button>
           </div>
         </div>
       </header>
 
-      <input ref={inputRef} className="visually-hidden" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={onInputChange} />
+      {!result ? <section className="ats-focus-landing" aria-labelledby="landing-title">
+        <div className="ats-focus-intro">
+          <p className="ats-focus-eyebrow">{copy.eyebrow}</p>
+          <h1 id="landing-title">{copy.title}</h1>
+          <p className="ats-focus-lead">{copy.intro}</p>
+          <ul className="ats-focus-benefits">
+            <li><span>01</span><div><strong>{es ? "Qué coincide con la oferta" : "What matches the job"}</strong><p>{es ? "Palabras clave presentes y requisitos que conviene revisar." : "Keywords already present and requirements to review."}</p></div></li>
+            <li><span>02</span><div><strong>{es ? "Qué cambiar primero" : "What to change first"}</strong><p>{es ? "Tres acciones prioritarias con evidencia, basadas en 21 comprobaciones del documento." : "Three priority actions with evidence, based on 21 document checks."}</p></div></li>
+            <li><span>03</span><div><strong>{es ? "Tu CV, mejor organizado" : "Your resume, better organized"}</strong><p>{es ? "Copia el texto o guarda un PDF con tus secciones en orden." : "Copy the text or save a PDF with your sections in order."}</p></div></li>
+          </ul>
+          <p className="ats-focus-limits">{es ? "ATS es el sistema que algunas empresas usan para procesar CV. Esta revisión te orienta; no garantiza superar sus filtros." : "An ATS is a system some companies use to process resumes. This review offers guidance; it does not guarantee passing their filters."}</p>
+        </div>
 
-      {!file ? (
-        <section className="ats-landing" aria-label={copy.eyebrow}>
-          <div className="ats-landing-copy">
-            <p>{copy.eyebrow}</p>
-            <h1>{copy.title}</h1>
-            <span>{copy.intro}</span>
-            <strong>{copy.landingLead}</strong>
-            <div
-              className={`ats-landing-dropzone ${dragging ? "dragging" : ""}`}
-              onDragEnter={(event) => { event.preventDefault(); setDragging(true); }}
-              onDragOver={(event) => event.preventDefault()}
-              onDragLeave={() => setDragging(false)}
-              onDrop={onDrop}
-            >
-              <span className="ats-file-icon" aria-hidden="true">CV</span>
-              <div><b>{copy.dropTitle}</b><small>{copy.uploadHelp}</small></div>
-              <button type="button" onClick={() => inputRef.current?.click()}>{copy.choose}</button>
+        <form className="ats-focus-form" onSubmit={(event) => { event.preventDefault(); void runAnalysis(); }} aria-busy={status === "reading" || status === "analyzing"}>
+          <div className="ats-focus-step"><span>1</span><h2>{copy.uploadTitle}</h2></div>
+          <input ref={inputRef} className="visually-hidden" type="file" aria-label={copy.choose} tabIndex={-1} accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={onInputChange} />
+          {!file ? <div className={`ats-focus-dropzone ${dragging ? "dragging" : ""}`}
+            onDragEnter={(event) => { event.preventDefault(); setDragging(true); }}
+            onDragOver={(event) => event.preventDefault()} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
+            <strong>{copy.dropTitle}</strong><p>{copy.uploadHelp}</p>
+            <button type="button" onClick={() => inputRef.current?.click()}>{copy.choose}<span aria-hidden="true"> ↑</span></button>
+          </div> : <div className="ats-focus-file" role="status">
+            <span className="ats-focus-file-type">{file.name.toLowerCase().endsWith(".pdf") ? "PDF" : "DOCX"}</span>
+            <div><strong>{file.name}</strong><p>{status === "reading" ? copy.reading : `${wordCount} ${copy.words}`}</p></div>
+            <button type="button" onClick={reset} aria-label={copy.remove}>×</button>
+          </div>}
+          {error && <p className="ats-focus-error" role="alert">{error}</p>}
+          <fieldset className="ats-focus-target" disabled={status === "analyzing"}>
+            <legend className="ats-focus-step"><span>2</span>{es ? "Cuéntanos a qué postulas" : "Tell us what you are applying for"}</legend>
+            <div className="ats-target-options">
+              <label><input type="radio" name="target-mode" value="vacancy" checked={targetMode === "vacancy"} onChange={() => setTargetMode("vacancy")} /><span>{es ? "Tengo una convocatoria" : "I have a job description"}</span></label>
+              <label><input type="radio" name="target-mode" value="role" checked={targetMode === "role"} onChange={() => setTargetMode("role")} /><span>{es ? "Solo tengo el puesto" : "I only have a job title"}</span></label>
             </div>
-            <small className="ats-landing-privacy"><span>✓</span>{copy.landingPrivacy}</small>
-            {error && <p className="ats-landing-error" role="alert">{error}</p>}
-            <div className="ats-badges" aria-label={language === "es" ? "Características" : "Features"}>
-              {copy.badges.map((badge) => <span key={badge}>✓ {badge}</span>)}
-            </div>
-          </div>
-
-          <div className="ats-report-preview" aria-hidden="true">
-            <div className="ats-preview-score">
-              <span>{copy.scoreLabel}</span>
-              <div><strong>78</strong><small>/100</small></div>
-              <p>5 {copy.previewProblems}</p>
-            </div>
-            <div className="ats-preview-report">
-              <p>{copy.previewEyebrow}</p>
-              <h2>{copy.previewTitle}</h2>
-              <div>
-                {copy.previewChecks.map((label, index) => (
-                  <article key={label}>
-                    <span>{String(index + 1).padStart(2, "0")}</span>
-                    <div><strong>{label}</strong><i><b style={{ width: `${[88, 78, 64, 70, 100][index]}%` }} /></i></div>
-                    <em>{[88, 78, 64, 70, 100][index]}%</em>
-                  </article>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-      ) : (
-        <>
-          <section className="ats-hero ats-hero-compact">
-            <div><p>{copy.eyebrow}</p><h1>{copy.title}</h1><span>{copy.intro}</span></div>
-            <div className="ats-badges" aria-label={language === "es" ? "Características" : "Features"}>
-              {copy.badges.map((badge) => <span key={badge}>✓ {badge}</span>)}
-            </div>
-          </section>
-
-          <section className="ats-workspace" aria-label={copy.eyebrow}>
-            <aside className="ats-input-panel">
-              <div className="ats-panel-heading">
-                <span>01</span>
-                <div><h2>{copy.uploadTitle}</h2><p>{copy.uploadHelp}</p></div>
-              </div>
-
-              <div className="ats-file-card" aria-live="polite">
-                <span>{file.name.toLowerCase().endsWith(".pdf") ? "PDF" : "DOCX"}</span>
-                <div>
-                  <strong>{file.name}</strong>
-                  <p>{status === "reading" ? copy.reading : `${copy.ready} · ${wordCount} ${copy.words}`}</p>
-                </div>
-                <button type="button" onClick={reset} aria-label={copy.remove}>×</button>
-              </div>
-              {error && <p className="ats-error" role="alert">{error}</p>}
-
-              <label className="ats-job-field">
-                <span>{copy.vacancyLabel}</span>
-                <small>{copy.vacancyHelp}</small>
-                <textarea value={jobDescription} onChange={(event) => setJobDescription(event.target.value)} placeholder={copy.vacancyPlaceholder} rows={8} />
-                {hasVacancy && <i className="ats-job-ready">✓ {copy.vacancyReady}</i>}
-              </label>
-
-              <button type="button" className="ats-primary-button" disabled={status !== "ready"} onClick={() => void runAnalysis()}>
-                {status === "analyzing" ? copy.analyzing : analyzeLabel} <span>→</span>
-              </button>
-              <p className="ats-local-note"><span>✓</span>{copy.safe}</p>
-            </aside>
-
-            <section className="ats-results-panel" aria-live="polite">
-              {status === "analyzing" ? (
-                <div className="ats-analysis-progress">
-                  <span className="ats-progress-spinner" />
-                  <p>{copy.analyzing}</p>
-                  <div>{copy.analysisStages.map((stage, index) => <span className={index < scanStage ? "complete" : ""} key={stage}>{index < scanStage ? "✓" : "·"} {stage}</span>)}</div>
-                </div>
-              ) : !result ? (
-                <div className="ats-empty-results">
-                  <p>{copy.beforeEyebrow}</p>
-                  <h2>{copy.beforeTitle}</h2>
-                  <div className="ats-check-list">
-                    {copy.checks.map(([title, description], index) => (
-                      <article key={title}>
-                        <span>0{index + 1}</span>
-                        <div><h3>{title}</h3><p>{description}</p></div>
-                      </article>
-                    ))}
-                  </div>
-                  <small>{copy.disclaimer}</small>
-                </div>
-              ) : (
-                <div className="ats-results">
-                  <div className="ats-report-layout">
-                    <aside className="ats-report-sidebar">
-                      <p>{copy.scoreLabel}</p>
-                      <div className="ats-score-ring" style={{ background: `conic-gradient(${scoreColor} ${result.score * 3.6}deg, #dce6ec 0deg)` }}>
-                        <div><strong>{result.score}</strong><span>/100</span></div>
-                      </div>
-                      <h2>{result.verdict}</h2>
-                      <span>{result.metrics.checkCount} {copy.completedChecks}</span>
-                      <small className="ats-score-method">{copy.scoreMethod}</small>
-                      <nav aria-label={copy.summary}>
-                        {result.auditGroups.map((group) => (
-                          <a className={group.score >= 75 ? "good" : group.score >= 50 ? "review" : "priority"} href={`#audit-${group.id}`} key={group.id}>
-                            <span>{group.label}<small>{group.issueCount} {copy.reviewChecks}</small></span>
-                            <strong>{group.score}%</strong>
-                          </a>
-                        ))}
-                      </nav>
-                    </aside>
-
-                    <div className="ats-report-content">
-                      <header className="ats-report-heading">
-                        <div><p>{copy.reportEyebrow}</p><h2>{copy.reportTitle}</h2></div>
-                        <div><span>✓ {result.metrics.passedCount} {copy.passedChecks}</span><span>{result.metrics.checkCount - result.metrics.passedCount} {copy.reviewChecks}</span></div>
-                      </header>
-
-                      <div className="ats-metrics">
-                        {[result.metrics.wordCount, result.metrics.sectionCount, result.metrics.metricCount, result.metrics.actionCount].map((value, index) => (
-                          <div key={copy.metrics[index]}><strong>{value}</strong><span>{copy.metrics[index]}</span></div>
-                        ))}
-                      </div>
-
-                      <section className="ats-audit-groups" aria-label={copy.summary}>
-                        {result.auditGroups.map((group, groupIndex) => (
-                          <details className={group.score >= 75 ? "good" : group.score >= 50 ? "review" : "priority"} id={`audit-${group.id}`} open={groupIndex === 0} key={group.id}>
-                            <summary><span><b>{group.label}</b><small>{group.checks.length} {copy.completedChecks} · {group.issueCount} {copy.reviewChecks}</small></span><strong>{group.score}%</strong></summary>
-                            <div className="ats-audit-checks">
-                              {group.checks.map((audit) => (
-                                <article className={audit.status} key={audit.id}>
-                                  <span>{audit.status === "pass" ? "✓" : audit.status === "warning" ? "!" : "×"}</span>
-                                  <div>
-                                    <header><h3>{audit.title}</h3><b>{copy.checkStatus[audit.status as keyof typeof copy.checkStatus]}</b></header>
-                                    <small>{copy.evidence}</small>
-                                    <p>{audit.evidence}</p>
-                                    {audit.status !== "pass" && <em>{audit.recommendation}</em>}
-                                  </div>
-                                </article>
-                              ))}
-                            </div>
-                          </details>
-                        ))}
-                      </section>
-
-                      <section className="ats-keyword-section">
-                        <div className="ats-section-title"><h3>{copy.keywordTitle}</h3></div>
-                        {result.keywordMatch ? (
-                          <>
-                            <div className="ats-keyword-columns">
-                              <div><span>{copy.matched}</span><div>{result.keywordMatch.matched.map((keyword) => <i className="matched" key={keyword}>{keyword}</i>)}</div></div>
-                              <div><span>{copy.missing}</span><div>{result.keywordMatch.missing.map((keyword) => <i className="missing" key={keyword}>{keyword}</i>)}</div></div>
-                            </div>
-                            <small className="ats-keyword-note">{copy.keywordHelp}</small>
-                          </>
-                        ) : <p>{hasVacancy ? copy.keywordUnclear : copy.keywordEmpty}</p>}
-                      </section>
-
-                      <section className="ats-strengths-section">
-                        <h3>{copy.strengthsTitle}</h3>
-                        {result.strengths.length ? <ul>{result.strengths.map((strength) => <li key={strength}>✓ {strength}</li>)}</ul> : <p>{copy.noStrengths}</p>}
-                      </section>
-                    </div>
-                  </div>
-
-                  <AiImprover
-                    key={`${jobDescription.length}-${jobDescription.slice(0, 120)}-${jobDescription.slice(-120)}`}
-                    resumeText={resumeText}
-                    jobDescription={jobDescription}
-                    language={language}
-                    onAdapt={adaptToJob}
-                  />
-
-                  <div className="ats-result-actions">
-                    <button type="button" onClick={reset}>{copy.another}</button>
-                    <a href="/">{copy.improve} →</a>
-                  </div>
-                  <small className="ats-disclaimer">{copy.disclaimer}</small>
-                </div>
-              )}
-            </section>
-          </section>
-        </>
-      )}
+            <label className="ats-target-label" htmlFor="ats-target">{targetMode === "vacancy" ? (es ? "Pega la convocatoria" : "Paste the job description") : (es ? "Puesto que buscas" : "Target job title")}</label>
+            {targetMode === "vacancy" ? <textarea id="ats-target" required maxLength={18_000} value={jobDescription} onChange={(event) => updateVacancy(event.target.value)} placeholder={copy.vacancyPlaceholder} rows={6} aria-describedby="ats-target-help" />
+              : <input id="ats-target" required maxLength={160} value={targetRole} onChange={(event) => setTargetRole(event.target.value)} placeholder={es ? "Ej. Analista de datos junior" : "e.g. Junior data analyst"} aria-describedby="ats-target-help" />}
+            <p id="ats-target-help">{targetMode === "vacancy" ? (es ? "Incluye funciones, herramientas y requisitos. Cuanto más completa, mejor la comparación." : "Include duties, tools and requirements. More detail makes the comparison more useful.") : (es ? "Te orientamos sobre el contenido y la estructura. Sin una oferta no calculamos un porcentaje de coincidencia." : "Get guidance on content and structure. Without a job description, we do not calculate a match percentage.")}</p>
+          </fieldset>
+          <button type="submit" className="ats-focus-submit" disabled={status !== "ready" || !hasTarget}>{status === "analyzing" ? copy.analyzing : copy.analyze}<span aria-hidden="true">→</span></button>
+          <p className="ats-focus-private">{es ? "Sin registro. Tu CV y el texto se analizan en este dispositivo." : "No account needed. Your resume and text are analyzed on this device."}</p>
+        </form>
+      </section> : <section className="ats-workspace has-report" aria-label={es ? "Resultado del análisis" : "Analysis results"}>
+        <AtsReport key={language + resumeText + targetText + targetMode} result={result} resumeText={resumeText} fileName={file?.name ?? (es ? "CV analizado" : "Analyzed resume")} targetLabel={targetLabel} language={language} onReset={reset} onEdit={() => setResult(null)} />
+      </section>}
+      <footer className="ats-focus-footer"><span>AlineaCV</span><p>{es ? "Mejora cómo presentas tu experiencia. Conserva lo que te hace único." : "Improve how you present your experience. Keep what makes you unique."}</p></footer>
     </main>
   );
 }

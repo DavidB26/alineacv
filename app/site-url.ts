@@ -1,26 +1,17 @@
 import { headers } from "next/headers";
 
-const trustedCloudflareSuffixes = [".workers.dev", ".pages.dev"];
+const hostedOrigin = "https://alineacv-ats.apoblete-developer.chatgpt.site";
 
 export async function getSiteOrigin() {
-  const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  const configuredUrl = process.env.NEXT_PUBLIC_SITE_URL;
   if (configuredUrl) {
-    const parsed = new URL(configuredUrl);
-    const isLocal = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
-    if (parsed.protocol !== "https:" && !(isLocal && parsed.protocol === "http:")) {
-      throw new Error("NEXT_PUBLIC_SITE_URL must use HTTPS outside local development.");
-    }
-    return parsed.origin;
+    try {
+      const url = new URL(configuredUrl);
+      if (url.protocol === "https:" || url.protocol === "http:") return url.origin;
+    } catch { /* Use the registered origin if configuration is invalid. */ }
   }
-
   const requestHeaders = await headers();
-  const host = requestHeaders.get("host") ?? "localhost:3000";
-  const hostname = new URL(`https://${host}`).hostname;
-  const isLocal = hostname === "localhost" || hostname === "127.0.0.1";
-  if (isLocal) return `http://${host}`;
-  if (trustedCloudflareSuffixes.some((suffix) => hostname.endsWith(suffix))) {
-    return `https://${host}`;
-  }
-
-  throw new Error("NEXT_PUBLIC_SITE_URL is required for non-Cloudflare domains.");
+  const host = requestHeaders.get("host") ?? "";
+  if (/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)) return `http://${host}`;
+  return hostedOrigin;
 }

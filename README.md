@@ -1,45 +1,35 @@
 # AlineaCV
 
-Creador bilingüe de currículums Harvard y ATS con vista previa en tiempo real, guardado local y exportación A4 a PDF.
+Landing bilingüe para revisar un CV frente a una convocatoria o un puesto objetivo.
 
-## Funciones de esta primera versión
+## Flujo
 
-- Editor por secciones: información personal, educación, experiencia y habilidades.
-- Interfaz en español e inglés.
-- Tres plantillas: Harvard Classic, Harvard Photo y Harvard Split.
-- Fotografía opcional procesada únicamente en el navegador.
-- Guardado automático en el dispositivo.
-- Vista previa responsive y exportación mediante el diálogo de impresión del navegador.
-- Analizador ATS local y mejora opcional mediante el nivel gratuito de Groq.
+1. Sube un PDF o DOCX con texto seleccionable (máximo 10 MB).
+2. Pega una convocatoria o escribe el puesto que buscas.
+3. Recibe hasta tres acciones prioritarias y el detalle de 21 comprobaciones del documento.
+4. Copia el CV reorganizado o guárdalo en PDF.
 
-## Requisitos
+La convocatoria permite comparar palabras clave conocidas. El porcentaje no representa una probabilidad de selección ni valida todos los requisitos. Con solo el puesto, se orienta el perfil usando la experiencia existente y se revisa el documento sin inventar requisitos ni mostrar un porcentaje de coincidencia.
 
-- Node.js 22.13 o superior.
+La lectura y el análisis se realizan en el navegador. No se requieren claves de IA, cuentas ni envío del CV a servidores. La exportación reorganiza las secciones conservando el texto original; no aplica automáticamente las recomendaciones.
+
+La portada contiene el flujo completo. La dirección anterior `/analizar-cv` redirige a `/`. El creador anterior se conserva en `app/legacy-builder.tsx` como código de referencia y no está expuesto como una página. El flujo no consulta vacantes externas ni necesita una base de datos.
 
 ## Desarrollo
+
+Node.js 22.13 o superior. Se preservan el gestor y las dependencias del proyecto.
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-La aplicación estará disponible en `http://localhost:3000`.
-
-## Mejora de CV con IA
-
-La revisión ATS básica funciona sin ninguna clave y se ejecuta en el navegador. Para habilitar la reescritura inteligente:
-
-1. Crea una clave en `https://console.groq.com/keys`.
-2. Copia `.env.example` como `.env.local`.
-3. Añade la clave únicamente en `GROQ_API_KEY`.
-4. Si usas un dominio propio, define `NEXT_PUBLIC_SITE_URL` con su origen HTTPS. Las direcciones `workers.dev` y `pages.dev` de Cloudflare se detectan automáticamente.
-5. Reinicia el servidor de desarrollo.
-
-La clave se utiliza exclusivamente en la ruta del servidor y no se expone al navegador. Antes del envío, los datos de contacto e identificadores se sustituyen por marcadores que solo se restauran en el dispositivo. El modelo predeterminado es `openai/gpt-oss-120b`; puede cambiarse con `GROQ_MODEL`.
+Origen local: `http://localhost:3000`. El origen público se configura mediante `NEXT_PUBLIC_SITE_URL`.
 
 ## Validación
 
 ```bash
 pnpm build
 pnpm lint
+node --test tests/*.test.mjs
 ```

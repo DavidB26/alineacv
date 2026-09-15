@@ -18,7 +18,7 @@ const navigationCopy = {
     builder: "Crear CV",
     builderDescription: "Diseña y descarga tu currículum.",
     analyzer: "Analizar CV",
-    analyzerDescription: "Revisa y mejora tu CV con IA.",
+    analyzerDescription: "Compara tu CV con una vacante.",
   },
   en: {
     label: "Tools",
@@ -28,7 +28,7 @@ const navigationCopy = {
     builder: "Build resume",
     builderDescription: "Create and download your resume.",
     analyzer: "Analyze resume",
-    analyzerDescription: "Review and improve it with AI.",
+    analyzerDescription: "Compare your resume against a job.",
   },
 } as const;
 

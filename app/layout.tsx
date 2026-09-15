@@ -8,8 +8,8 @@ import "@fontsource-variable/source-serif-4";
 import "./globals.css";
 import { getSiteOrigin } from "./site-url";
 
-const title = "Creador de CV Harvard y ATS gratis | AlineaCV";
-const description = "Crea tu CV Harvard gratis, edítalo en español o inglés y expórtalo en PDF A4. Plantillas profesionales, legibles y compatibles con sistemas ATS.";
+const title = "Analizador de CV ATS gratis | AlineaCV";
+const description = "Sube tu CV y compáralo con una convocatoria o indica el puesto que buscas. Recibe recomendaciones concretas y un CV reorganizado. Análisis local y privado.";
 
 export const viewport: Viewport = {
   colorScheme: "light",
