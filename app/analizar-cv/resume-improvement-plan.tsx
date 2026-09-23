@@ -3,29 +3,70 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { analyzeResume } from "./analysis.mjs";
-import { improvementActions, reorganizeResume } from "./resume-improvements.mjs";
+import { appendConfirmedEvidence, automaticProjectSuggestions, buildAdaptedResume } from "./adapted-resume.mjs";
 
 type Language = "es" | "en";
+type ResumeBlock =
+  | { type: "entry"; title: string; date: string; meta: string[]; bullets: string[] }
+  | { type: "row"; label: string; value: string }
+  | { type: "paragraph"; text: string };
+type AdaptedDocument = {
+  name: string;
+  headline: string;
+  contactLines: string[];
+  sections: Array<{ kind: string; heading: string; blocks: ResumeBlock[] }>;
+  plainText: string;
+};
 
-export default function ResumeImprovementPlan({ result, resumeText, language, onReanalyze }: {
+export function ReferenceResumeDocument({ resume, language }: { resume: AdaptedDocument; language: Language }) {
+  return <article className="ats-export-document reference-resume" lang={language}>
+    <header className="reference-resume-header">
+      <h1>{resume.name}</h1>
+      <p>{resume.headline}</p>
+      {resume.contactLines.length > 0 && <div>{resume.contactLines.map((line, index) => <span key={index}>{line}</span>)}</div>}
+    </header>
+    <main>
+      {resume.sections.map((section) => <section className={"reference-section reference-section-" + section.kind} key={section.kind}>
+        <h2>{section.heading}</h2>
+        {section.blocks.map((block, index) => {
+          if (block.type === "entry") return <article className="reference-entry" key={index}>
+            {(block.title || block.date) && <header><strong>{block.title}</strong>{block.date && <time>{block.date}</time>}</header>}
+            {block.meta.map((line, metaIndex) => <p className="reference-entry-meta" key={metaIndex}>{line}</p>)}
+            {block.bullets.length > 0 && <ul>{block.bullets.map((line, bulletIndex) => <li key={bulletIndex}>{line}</li>)}</ul>}
+          </article>;
+          if (block.type === "row") return <p className="reference-row" key={index}><strong>{block.label}:</strong><span>{block.value}</span></p>;
+          return <p key={index}>{block.text}</p>;
+        })}
+      </section>)}
+    </main>
+  </article>;
+}
+
+export default function ResumeImprovementPlan({ result, originalResumeText, fileName, targetLabel, versionName, language }: {
   result: ReturnType<typeof analyzeResume>;
-  resumeText: string;
+  originalResumeText: string;
+  fileName: string;
+  targetLabel: string;
+  versionName: string;
   language: Language;
-  onReanalyze: () => void;
 }) {
-  const [reviewed, setReviewed] = useState<string[]>([]);
-  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle");
-  const [printing, setPrinting] = useState(false);
-  const actions = useMemo(() => improvementActions(result, language), [result, language]);
-  const resume = useMemo(() => reorganizeResume(resumeText), [resumeText]);
   const es = language === "es";
-  const progress = actions.length ? Math.round((reviewed.length / actions.length) * 100) : 0;
-  const reviewComplete = actions.length > 0 && reviewed.length === actions.length;
+  const projects = useMemo(() =>
+    automaticProjectSuggestions(result, targetLabel, originalResumeText, language),
+  [result, targetLabel, originalResumeText, language]);
+  const completeResumeText = useMemo(() =>
+    appendConfirmedEvidence(originalResumeText, projects, language),
+  [originalResumeText, projects, language]);
+  const adaptedResume = useMemo<AdaptedDocument>(() =>
+    buildAdaptedResume(completeResumeText, result, targetLabel, language, { fileName }),
+  [completeResumeText, result, targetLabel, language, fileName]);
+  const [printing, setPrinting] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle");
 
   useEffect(() => {
     if (!printing) return;
     const originalTitle = document.title;
-    document.title = es ? "CV reorganizado" : "Reorganized resume";
+    document.title = versionName;
     document.body.classList.add("alineacv-printing");
     const finish = () => setPrinting(false);
     window.addEventListener("afterprint", finish);
@@ -36,64 +77,46 @@ export default function ResumeImprovementPlan({ result, resumeText, language, on
       document.body.classList.remove("alineacv-printing");
       document.title = originalTitle;
     };
-  }, [printing, es]);
+  }, [printing, versionName]);
 
   async function copyResume() {
     try {
-      await navigator.clipboard.writeText(resume.text);
+      await navigator.clipboard.writeText(adaptedResume.plainText);
       setCopyStatus("copied");
     } catch {
       setCopyStatus("error");
     }
   }
 
-  return (
-    <section className="resume-improvement-plan" aria-labelledby="improvement-plan-title">
-      <h2 id="improvement-plan-title">{es ? "Qué cambiar o agregar" : "What to change or add"}</h2>
-      <div className="improvement-progress" aria-live="polite">
-        <div><strong>{reviewed.length}/{actions.length}</strong><span>{es ? "acciones revisadas" : "actions reviewed"}</span></div>
-        <div className="improvement-progress-track" aria-hidden="true"><i style={{ width: `${progress}%` }} /></div>
+  return <section className="resume-improvement-plan automatic-resume-plan" aria-labelledby="improvement-plan-title">
+    <h2 id="improvement-plan-title">{es ? "Proyectos para cubrir las brechas" : "Projects to close the gaps"}</h2>
+    <p className="automatic-resume-intro">{projects.length
+      ? (es
+        ? `Tu CV actual tiene ${result.score ?? "—"}% de coincidencia. Ese es el puntaje real del archivo que subiste. Estos proyectos se incorporarán en la versión descargable sin alterar artificialmente ese porcentaje.`
+        : `Your current resume has a ${result.score ?? "—"}% match. That is the actual score of the file you uploaded. These projects will be included in the downloadable version without artificially changing that percentage.`)
+      : (es ? "Tu CV no presenta brechas de palabras clave detectables para esta oferta." : "Your resume has no detectable keyword gaps for this job.")}</p>
+
+    {projects.length > 0 && <section className="automatic-projects" aria-labelledby="automatic-projects-title">
+      <h3 id="automatic-projects-title">{es ? "Esto se añadirá al CV descargable" : "This will be added to the downloadable resume"}</h3>
+      <div>
+        {projects.map((project, index) => <article className="automatic-project-card" key={project.id}>
+          <span className="automatic-project-number">{es ? `Proyecto sugerido ${index + 1}` : `Suggested project ${index + 1}`}</span>
+          <h4>{project.title}</h4>
+          <p>{project.text}</p>
+          <strong className="automatic-project-keyword-label">{es ? "Requisitos que aborda" : "Requirements addressed"}</strong>
+          <ul aria-label={es ? "Requisitos que aborda" : "Requirements addressed"}>
+            {project.keywords.map((keyword) => <li key={keyword}>{keyword}</li>)}
+          </ul>
+        </article>)}
       </div>
-      <ul className="improvement-checklist">
-        {actions.map((action) => {
-          const isReviewed = reviewed.includes(action.id);
-          return <li key={action.id} className={isReviewed ? "reviewed" : ""}>
-            <label htmlFor={`review-${action.id}`} aria-label={action.title}>
-              <input id={`review-${action.id}`} type="checkbox" checked={isReviewed} onChange={(event) => setReviewed((previous) => event.target.checked ? [...previous, action.id] : previous.filter((id) => id !== action.id))} />
-              <strong>{action.title}</strong>
-            </label>
-            <div className="improvement-action-body">
-              {isReviewed ? <details className="improvement-action-details">
-                <summary><span><b>{es ? "Evidencia" : "Evidence"}:</b> {action.evidence}</span><i>{es ? "Ver detalle" : "View details"}</i></summary>
-                <p>{action.description}</p>
-              </details> : <>
-                <small><b>{es ? "Evidencia" : "Evidence"}:</b> {action.evidence}</small>
-                <p>{action.description}</p>
-              </>}
-            </div>
-          </li>;
-        })}
-      </ul>
-      <div className={`improvement-primary-action ${reviewComplete ? "complete" : ""}`}>
-        <button type="button" className={reviewComplete ? "ready" : ""} onClick={onReanalyze}>{es ? "Volver a analizar" : "Analyze again"}<span aria-hidden="true">→</span></button>
-        <p>{reviewComplete
-          ? (es ? "Sube la nueva versión para ver si mejora el puntaje." : "Upload the new version to see if the score improves.")
-          : (es ? "Marca cada acción cuando termines de revisarla." : "Mark each action after you finish reviewing it.")}</p>
-      </div>
-      <div className="resume-export-actions" aria-label={es ? "Opciones del CV reorganizado" : "Reorganized resume options"}>
-        <button type="button" onClick={() => setPrinting(true)} disabled={printing}>{es ? "Guardar CV reorganizado en PDF" : "Save reorganized resume as PDF"} <span aria-hidden="true">↓</span></button>
-        <button type="button" onClick={() => void copyResume()}>{copyStatus === "copied" ? (es ? "Copiado ✓" : "Copied ✓") : (es ? "Copiar CV" : "Copy resume")}</button>
-      </div>
-      <p className="resume-export-note">{es ? "Reorganizamos las secciones con tu texto original. No añadimos experiencia." : "We reorganize the sections using your original text. We do not add experience."}</p>
-      {copyStatus !== "idle" && <p className="resume-copy-status" role="status">{copyStatus === "copied" ? (es ? "CV reorganizado copiado." : "Reorganized resume copied.") : (es ? "No se pudo copiar. Puedes guardar el CV en PDF." : "Could not copy. You can save the resume as PDF.")}</p>}
-      {printing && createPortal(
-        <article className="ats-export-document" lang={language}>
-          <header>{resume.header.map((line, index) => <p key={index}>{line}</p>)}</header>
-          {resume.sections.map((section, index) => (
-            <section key={index}><h2>{section.heading}</h2>{section.lines.map((line, lineIndex) => <p key={lineIndex}>{line}</p>)}</section>
-          ))}
-        </article>, document.body,
-      )}
-    </section>
-  );
+    </section>}
+
+    <div className="resume-export-actions" aria-label={es ? "Descargar CV adaptado" : "Download adapted resume"}>
+      <button className="primary" type="button" onClick={() => setPrinting(true)} disabled={printing}>{es ? "Descargar CV completo en PDF" : "Download complete resume as PDF"} <span aria-hidden="true">↓</span></button>
+      <button type="button" onClick={() => void copyResume()}>{copyStatus === "copied" ? (es ? "Copiado ✓" : "Copied ✓") : (es ? "Copiar CV completo" : "Copy complete resume")}</button>
+    </div>
+    <p className="resume-export-note">{es ? "La descarga conserva tu experiencia original y añade estos proyectos en una sección separada y presentable." : "The download keeps your original experience and adds these projects in a separate, polished section."}</p>
+    {copyStatus === "error" && <p className="resume-copy-status" role="status">{es ? "No se pudo copiar. Puedes descargar el PDF." : "Could not copy. You can download the PDF."}</p>}
+    {printing && createPortal(<ReferenceResumeDocument resume={adaptedResume} language={language} />, document.body)}
+  </section>;
 }

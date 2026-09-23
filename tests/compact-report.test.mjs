@@ -4,7 +4,7 @@ import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { analyzeResume } from "../app/analizar-cv/analysis.mjs";
-import { improvementActions, reorganizeResume } from "../app/analizar-cv/resume-improvements.mjs";
+import { applyResumeLineEdits, editableImprovementTargets, improvementActions, reorganizeResume, repairWrappedResumeLines } from "../app/analizar-cv/resume-improvements.mjs";
 
 register("./report-test-loader.mjs", import.meta.url);
 const { default: AtsReport } = await import("../app/analizar-cv/ats-report.tsx");
@@ -18,6 +18,7 @@ Universidad de Lima, 2016 — 2020
 EXPERIENCIA PROFESIONAL
 Desarrolladora frontend · 2020 — Actualidad
 • Mejoré la velocidad de carga en 18%.
+• Colaboración con el equipo de frontend.
 PERFIL PROFESIONAL
 Desarrolladora de interfaces accesibles.
 IDIOMAS
@@ -40,6 +41,59 @@ test("preserves unlabeled text and repeated sections rather than discarding cont
   assert.equal(reorganizeResume("Una sola línea con SQL y 10 años.").text, "Una sola línea con SQL y 10 años.");
 });
 
+test("repairs visual PDF line wraps inside bullets without joining the next dated entry", () => {
+  const extracted = `EXPERIENCIA PROFESIONAL
+• Mejorar la experiencia y reducir fricción mediante
+pruebas de usuario y análisis de conversión.
+Desarrollador web · 05/2023 — Presente
+• Construir un portal completo.`;
+  const repaired = repairWrappedResumeLines(extracted);
+  assert.match(repaired, /mediante pruebas de usuario y análisis de conversión\./);
+  assert.match(repaired, /\nDesarrollador web · 05\/2023 — Presente\n/);
+});
+
+test("removes printed page labels without polluting the name or the last bullet", () => {
+  const extracted = `David Beslanga Rabanal | CV profesional Página 1
+David Beslanga Rabanal
+EXPERIENCIA PROFESIONAL
+(cid:127) Coordinar entregas en plazos acotados.
+David Beslanga Rabanal | CV profesional Página 2
+EXPERIENCIA PROFESIONAL - CONTINUACIÓN
+(cid:127) Desarrollar sitios accesibles.`;
+  const repaired = repairWrappedResumeLines(extracted);
+  const organized = reorganizeResume(repaired);
+  assert.equal(organized.header.filter((line) => line === "David Beslanga Rabanal").length, 1);
+  assert.doesNotMatch(organized.text, /CV profesional Página/);
+  assert.ok(organized.sections.every((section) => section.kind === "experience"));
+  assert.match(organized.text, /\(cid:127\) Coordinar entregas en plazos acotados\./);
+  assert.match(organized.text, /\(cid:127\) Desarrollar sitios accesibles\./);
+});
+
+test("selects the original problematic bullet and applies edits only to the working copy", () => {
+  const result = analyzeResume(resume, vacancy, "es");
+  const targets = editableImprovementTargets(result, resume, "es");
+  assert.ok(targets.length > 0);
+  assert.match(targets[0].originalText, /Colaboración con el equipo/);
+  assert.ok(targets[0].rules.some((rule) => rule.type === "metric" || rule.type === "quantified-action"));
+  assert.ok(targets.every((target) => target.rules.every((rule) => rule.type !== "keyword")));
+  const edited = applyResumeLineEdits(resume, [{ ...targets[0], currentText: "Mejoré la velocidad en 30% usando Docker." }]);
+  assert.match(edited, /Mejoré la velocidad en 30% usando Docker/);
+  assert.match(resume, /Mejoré la velocidad de carga en 18%/);
+});
+
+test("preserves long pasted bullet text without truncating the working copy", () => {
+  const longText = `Desarrollé ${"componentes reutilizables y documentación técnica ".repeat(24)}para el equipo.`;
+  const edited = applyResumeLineEdits(resume, [{
+    lineIndex: 8,
+    prefix: "• ",
+    originalText: "Mejoré la velocidad de carga en 18%.",
+    currentText: longText,
+  }]);
+
+  assert.ok(longText.length > 1_000);
+  assert.equal(edited.split(/\n/)[8], `• ${longText}`);
+});
+
 test("keeps the checklist short and never tells the user to invent a missing skill", () => {
   const result = analyzeResume(resume, vacancy, "es");
   const original = JSON.stringify(result);
@@ -52,46 +106,50 @@ test("keeps the checklist short and never tells the user to invent a missing ski
   assert.equal(JSON.stringify(result), original);
 });
 
-test("shows score and actions first, with compact technical details and no job form", () => {
+test("automatically adds missing requirements as projects and offers the complete resume", () => {
   const result = analyzeResume(resume, vacancy, "es");
-  const html = renderToStaticMarkup(createElement(AtsReport, { result, resumeText: resume, fileName: "camila-cv.pdf", targetLabel: "Desarrollador frontend", language: "es", onReset() {}, onEdit() {} }));
-  assert.match(html, /Coincidencia de palabras clave/);
+  const html = renderToStaticMarkup(createElement(AtsReport, { result, resumeText: resume, fileName: "camila-cv.pdf", targetLabel: "Desarrollador frontend", versionName: "CV - Acme - Desarrollador frontend", language: "es", onReset() {}, onEdit() {} }));
+  assert.match(html, /Coincidencia actual del CV/);
   assert.match(html, /camila-cv\.pdf/);
   assert.match(html, /Desarrollador frontend/);
-  assert.match(html, /Qué cambiar o agregar/);
-  assert.match(html, /Volver a analizar/);
-  assert.match(html, /Guardar CV reorganizado en PDF/);
-  assert.match(html, /Copiar CV/);
+  assert.match(html, /Proyectos para cubrir las brechas/);
+  assert.doesNotMatch(html, /Volver a analizar/);
+  assert.match(html, /Descargar CV completo en PDF/);
+  assert.match(html, /Copiar CV completo/);
+  assert.match(html, /Esto se añadirá al CV descargable/);
+  assert.match(html, /Proyecto técnico con Docker/);
+  assert.match(html, /Tu CV actual tiene 67% de coincidencia/);
+  assert.doesNotMatch(html, /Usar este borrador|Confirmo que puedo respaldarlo e incluirlo|Versión guardada/);
+  assert.doesNotMatch(html, /<textarea/);
   assert.match(html, /Palabras clave de la vacante/);
   assert.match(html, /class="matched" aria-label="React: Encontradas"/);
   assert.match(html, /class="missing" aria-label="Docker: No encontradas"/);
+  assert.match(html, /<strong>67<\/strong><span>%<\/span>/);
+  assert.doesNotMatch(html, /<strong>100<\/strong><span>%<\/span>/);
   assert.match(html, /0–49 Baja/);
   assert.match(html, /50–79 Parcial/);
   assert.match(html, /80–100 Alta/);
+  assert.match(html, /Calidad del documento/);
   assert.doesNotMatch(html, /Ver vacantes similares|Abrir creador de CV/);
-  const completeGroups = result.auditGroups.filter((group) => group.issueCount === 0);
-  assert.equal((html.match(/<details\b/g) ?? []).length, 1 + completeGroups.length);
   assert.doesNotMatch(html, /<details[^>]*\bopen(?:=|\s|>)/);
   const technical = html.indexOf('<details class="ats-technical-details"');
-  assert.ok(html.indexOf("Qué cambiar o agregar") < technical);
+  assert.ok(html.indexOf("Proyectos para cubrir las brechas") < technical);
   assert.ok(html.indexOf("Palabras clave de la vacante") < technical);
-  assert.ok(html.indexOf("Volver a analizar") < technical);
   for (const group of result.auditGroups) assert.ok(html.indexOf(`<h2>${group.label}</h2>`) > technical);
-  for (const group of completeGroups) assert.match(html, new RegExp(`${group.checks.length} de ${group.checks.length} correctas`));
   assert.ok(html.indexOf("ats-audit-checks") < html.indexOf("ats-passed-checks"));
   assert.match(html, /class="ats-passed-check"/);
   assert.doesNotMatch(html, /0 por revisar/);
-  assert.match(html, /Reorganizamos las secciones con tu texto original\. No añadimos experiencia\./);
+  assert.match(html, /La descarga conserva tu experiencia original y añade estos proyectos/);
   assert.doesNotMatch(html, /<form|Puesto que buscas|Habilidades para la búsqueda|ats-report-sidebar/);
   assert.doesNotMatch(html, /similar-remote-title/);
 });
 
 test("does not render an invented percentage when requirements cannot be identified", () => {
   const result = analyzeResume(resume, "Una oportunidad para ti.", "en");
-  const html = renderToStaticMarkup(createElement(AtsReport, { result, resumeText: resume, fileName: "camila-cv.pdf", targetLabel: "Frontend developer", language: "en", onReset() {}, onEdit() {} }));
+  const html = renderToStaticMarkup(createElement(AtsReport, { result, resumeText: resume, fileName: "camila-cv.pdf", targetLabel: "Frontend developer", versionName: "CV - Frontend developer", language: "en", onReset() {}, onEdit() {} }));
   assert.match(html, /No measurable score/);
   assert.match(html, /<div class="ats-match-number"><strong>—<\/strong><\/div>/);
-  assert.match(html, /What to change or add/);
+  assert.match(html, /Projects to close the gaps/);
 });
 
 test("job-title guidance does not invent a job score or employer requirements", () => {
@@ -104,7 +162,7 @@ test("job-title guidance does not invent a job score or employer requirements", 
   assert.equal(actions[0].id, "role-focus");
   assert.match(actions[0].title, /Desarrolladora React/);
   assert.doesNotMatch(actions.map((a) => a.title).join(" "), /Completa la descripción de la vacante/);
-  const html = renderToStaticMarkup(createElement(AtsReport, { result, resumeText: resume, fileName: "camila-cv.pdf", targetLabel: role, language: "es", onReset() {}, onEdit() {} }));
+  const html = renderToStaticMarkup(createElement(AtsReport, { result, resumeText: resume, fileName: "camila-cv.pdf", targetLabel: role, versionName: "CV - Desarrolladora React", language: "es", onReset() {}, onEdit() {} }));
   assert.match(html, /Tu puesto objetivo/);
   assert.match(html, /Desarrolladora React/);
   assert.doesNotMatch(html, /ats-visible-keywords|ats-score-guide/);

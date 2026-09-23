@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { analyzeResume, resumeSearchSkills } from "../app/analizar-cv/analysis.mjs";
+import { analyzeResume, applyResumeBulletEdits, resumeSearchSkills, validateResumeBullet } from "../app/analizar-cv/analysis.mjs";
 
 const achievements = Array.from({ length: 18 }, (_, index) =>
   `• Implementé la campaña ${index + 1} y aumenté los leads en ${20 + index}% para más de ${100 + index} clientes.`,
@@ -93,4 +93,75 @@ test("job-search skill extraction excludes names, contact details and heading ac
   const skills = resumeSearchSkills("CAMILA TORRES camila@example.com +51 987 654 321 PERFIL PROFESIONAL HABILIDADES React y TypeScript");
   assert.equal(skills, "TypeScript, React");
   assert.doesNotMatch(skills, /Camila|Torres|email|987|PERFIL|HABILIDADES/i);
+});
+
+test("uses the same bullet rules for initial analysis and live revalidation", () => {
+  const original = "Desarrollé componentes reutilizables para el equipo de frontend.";
+  const edited = "Desarrollé componentes reutilizables con Docker y reduje el tiempo de entrega en 30%.";
+  const before = validateResumeBullet(original, { keywords: ["Docker"] });
+  const after = validateResumeBullet(edited, { keywords: ["Docker"] });
+
+  assert.equal(before.hasActionVerb, true);
+  assert.equal(before.hasMetric, false);
+  assert.equal(before.hasQuantifiedAction, false);
+  assert.deepEqual(before.matchedKeywords, []);
+  assert.equal(after.hasActionVerb, true);
+  assert.equal(after.hasMetric, true);
+  assert.equal(after.hasQuantifiedAction, true);
+  assert.deepEqual(after.matchedKeywords, ["Docker"]);
+});
+
+test("recognizes written Spanish numbers and common measurable-result phrases", () => {
+  const cases = [
+    "Reduje el tiempo de carga de siete a tres segundos.",
+    "Aumenté la capacidad al doble.",
+    "Reduje los costos a la mitad.",
+    "Atendí cien usuarios durante el lanzamiento.",
+    "Mejoré la conversión en 12%.",
+  ];
+
+  for (const bullet of cases) {
+    const validation = validateResumeBullet(bullet);
+    assert.equal(validation.hasMetric, true, bullet);
+    assert.ok(validation.metricCount >= 1, bullet);
+  }
+  assert.equal(validateResumeBullet(cases[0]).hasQuantifiedAction, true);
+  assert.equal(validateResumeBullet("Participé en reuniones del equipo.").hasMetric, false);
+});
+
+test("an empty edited bullet fails every relevant live rule", () => {
+  const validation = validateResumeBullet("", { keywords: ["Docker"] });
+  assert.equal(validation.hasMetric, false);
+  assert.equal(validation.hasActionVerb, false);
+  assert.equal(validation.hasQuantifiedAction, false);
+  assert.deepEqual(validation.matchedKeywords, []);
+});
+
+test("updates keyword score and Impact incrementally from one edited bullet", () => {
+  const vacancy = "Requisitos: React, TypeScript y Docker.";
+  const result = analyzeResume(strongResume, vacancy, "es");
+  const originalText = "• Coordiné proyectos de SEO, Google Analytics y HubSpot con equipos comerciales.";
+  const currentText = "• Coordiné proyectos con Docker y reduje el tiempo de entrega en 30% para 300 usuarios.";
+  const live = applyResumeBulletEdits(result, [{ originalText, currentText }], "es");
+  const initialImpact = result.auditGroups.find((group) => group.id === "impact").score;
+  const liveImpact = live.auditGroups.find((group) => group.id === "impact").score;
+
+  assert.ok(live.score > result.score);
+  assert.ok(live.keywordMatch.matched.includes("Docker"));
+  assert.ok(!live.keywordMatch.missing.includes("Docker"));
+  assert.ok(liveImpact >= initialImpact);
+  assert.ok(live.atsQualityScore >= result.atsQualityScore);
+});
+
+test("incremental scoring uses written-number evidence from the shared engine", () => {
+  const result = analyzeResume(strongResume, "Requisitos: React y TypeScript.", "es");
+  const originalText = "• Coordiné proyectos de SEO, Google Analytics y HubSpot con equipos comerciales.";
+  const currentText = "• Reduje el tiempo de carga de siete a tres segundos.";
+  const live = applyResumeBulletEdits(result, [{ originalText, currentText }], "es");
+
+  assert.ok(live.metrics.metricCount > result.metrics.metricCount);
+  assert.match(
+    live.auditGroups.find((group) => group.id === "impact").checks.find((check) => check.id === "quantified-actions").evidence,
+    /líneas combinan una acción con una cifra/,
+  );
 });

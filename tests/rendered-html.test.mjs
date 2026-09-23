@@ -32,7 +32,8 @@ test("server-renders the ATS landing with both inputs and focused metadata", asy
   assert.match(html, /type="file"/);
   assert.match(html, /<textarea/);
   assert.match(html, /Analizar mi CV/);
-  assert.match(html, /Tres acciones prioritarias con evidencia, basadas en 21 comprobaciones/);
+  assert.match(html, /Generamos proyectos según los requisitos de la oferta que todavía no aparecen en tu CV/);
+  assert.match(html, /Descarga tu CV original, reorganizado para ATS e incluyendo los proyectos adicionales/);
   assert.match(html, /application\/ld\+json/);
   assert.match(html, /rel="canonical" href="http:\/\/localhost(?::3000)?"/);
   assert.match(html, /property="og:image"/);

@@ -4,12 +4,14 @@
 
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { analyzeResume } from "./analysis.mjs";
+import { adaptedVersionName } from "./adapted-resume.mjs";
 import AtsReport from "./ats-report";
+import { extractPdfOperatorItems, extractPdfPageText } from "./pdf-text-extraction.mjs";
+import { repairWrappedResumeLines } from "./resume-improvements.mjs";
 
 type Language = "es" | "en";
 type TargetMode = "vacancy" | "role";
 type Status = "idle" | "reading" | "analyzing" | "ready" | "error";
-
 const dictionary = {
   es: {
     privacy: "Tu CV y la vacante se analizan en este dispositivo.",
@@ -183,7 +185,10 @@ async function extractPdf(file: File) {
     for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
       const page = await document.getPage(pageNumber);
       const content = await page.getTextContent();
-      pages.push(content.items.map((item) => ("str" in item ? `${item.str}${item.hasEOL ? "\n" : " "}` : "")).join(""));
+      const viewport = page.getViewport({ scale: 1 });
+      const operatorList = await page.getOperatorList();
+      const operatorItems = extractPdfOperatorItems(operatorList, pdfjs.OPS, viewport.width, viewport.height);
+      pages.push(extractPdfPageText(content.items, viewport.width, operatorItems));
     }
     return pages.join("\n\n");
   } finally {
@@ -206,8 +211,15 @@ function vacancyLabel(description: string, language: Language) {
   const lines = description.split(/\n+/).map((line) => line.trim()).filter(Boolean);
   const labeledLine = lines.find((line) => /^(puesto|cargo|posición|position|role|job title)\s*:/i.test(line));
   const explicitTitle = labeledLine?.replace(/^[^:]+:\s*/, "").trim();
-  const firstLine = lines[0]?.length <= 80 ? lines[0] : "";
-  return explicitTitle || firstLine || (language === "es" ? "Convocatoria cargada" : "Job description added");
+  const searchedTitle = description.match(/\b(?:buscamos|se busca|we are looking for)\s+(?:(?:un|una|a|an)\s+)?([^.,;\n]{3,70})/i)?.[1]?.trim();
+  const firstLine = lines[0]?.length <= 70 && !/^(descripción|description|sobre |about |requisitos|requirements|funciones|responsibilities)\b/i.test(lines[0]) ? lines[0] : "";
+  return explicitTitle || searchedTitle || firstLine || (language === "es" ? "Vacante analizada" : "Analyzed job");
+}
+
+function vacancyCompany(description: string) {
+  const lines = description.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  const labeledLine = lines.find((line) => /^(empresa|compañía|organización|company|organization)\s*:/i.test(line));
+  return labeledLine?.replace(/^[^:]+:\s*/, "").trim() ?? "";
 }
 
 export default function AtsAnalyzer() {
@@ -251,7 +263,7 @@ export default function AtsAnalyzer() {
       const extension = nextFile.name.split(".").pop()?.toLowerCase();
       const extracted = extension === "pdf" ? await extractPdf(nextFile) : await extractDocx(nextFile);
       if (version !== readVersion.current) return;
-      const cleaned = extracted.split(String.fromCharCode(0)).join(" ").replace(/[ \t]+/g, " ").trim();
+      const cleaned = repairWrappedResumeLines(extracted.split(String.fromCharCode(0)).join(" ").replace(/[ \t]+/g, " ").trim());
       if (cleaned.split(/\s+/).length < 40) throw new Error("empty");
       setResumeText(cleaned);
       setStatus("ready");
@@ -282,7 +294,8 @@ export default function AtsAnalyzer() {
     setStatus("analyzing");
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     if (version !== readVersion.current) return;
-    setResult(analyzeResume(resumeText, targetText, language, targetMode));
+    const nextResult = analyzeResume(resumeText, targetText, language, targetMode);
+    setResult(nextResult);
     setStatus("ready");
   }
 
@@ -302,13 +315,16 @@ export default function AtsAnalyzer() {
 
   function changeLanguage(nextLanguage: Language) {
     setLanguage(nextLanguage);
-    if (resumeText && result) setResult(analyzeResume(resumeText, targetText, nextLanguage, targetMode));
+    if (resumeText && result) {
+      setResult(analyzeResume(resumeText, targetText, nextLanguage, targetMode));
+    }
   }
 
   const wordCount = resumeText ? resumeText.split(/\s+/).filter(Boolean).length : 0;
   const es = language === "es";
   const hasTarget = targetText.trim().length > 0;
   const targetLabel = targetMode === "role" ? targetRole.trim() : vacancyLabel(jobDescription, language);
+  const versionName = adaptedVersionName(targetLabel, targetMode === "vacancy" ? vacancyCompany(jobDescription) : "", language);
 
   useEffect(() => {
     if (!result) return;
@@ -340,8 +356,8 @@ export default function AtsAnalyzer() {
           <p className="ats-focus-lead">{copy.intro}</p>
           <ul className="ats-focus-benefits">
             <li><span>01</span><div><strong>{es ? "Qué coincide con la oferta" : "What matches the job"}</strong><p>{es ? "Palabras clave presentes y requisitos que conviene revisar." : "Keywords already present and requirements to review."}</p></div></li>
-            <li><span>02</span><div><strong>{es ? "Qué cambiar primero" : "What to change first"}</strong><p>{es ? "Tres acciones prioritarias con evidencia, basadas en 21 comprobaciones del documento." : "Three priority actions with evidence, based on 21 document checks."}</p></div></li>
-            <li><span>03</span><div><strong>{es ? "Tu CV, mejor organizado" : "Your resume, better organized"}</strong><p>{es ? "Copia el texto o guarda un PDF con tus secciones en orden." : "Copy the text or save a PDF with your sections in order."}</p></div></li>
+            <li><span>02</span><div><strong>{es ? "Proyectos para cubrir brechas" : "Projects to close gaps"}</strong><p>{es ? "Generamos proyectos según los requisitos de la oferta que todavía no aparecen en tu CV." : "We generate projects for job requirements that are not yet present in your resume."}</p></div></li>
+            <li><span>03</span><div><strong>{es ? "Un CV completo para postular" : "A complete resume ready to apply"}</strong><p>{es ? "Descarga tu CV original, reorganizado para ATS e incluyendo los proyectos adicionales." : "Download your original resume, reorganized for ATS and including the additional projects."}</p></div></li>
           </ul>
           <p className="ats-focus-limits">{es ? "ATS es el sistema que algunas empresas usan para procesar CV. Esta revisión te orienta; no garantiza superar sus filtros." : "An ATS is a system some companies use to process resumes. This review offers guidance; it does not guarantee passing their filters."}</p>
         </div>
@@ -375,7 +391,7 @@ export default function AtsAnalyzer() {
           <p className="ats-focus-private">{es ? "Sin registro. Tu CV y el texto se analizan en este dispositivo." : "No account needed. Your resume and text are analyzed on this device."}</p>
         </form>
       </section> : <section className="ats-workspace has-report" aria-label={es ? "Resultado del análisis" : "Analysis results"}>
-        <AtsReport key={language + resumeText + targetText + targetMode} result={result} resumeText={resumeText} fileName={file?.name ?? (es ? "CV analizado" : "Analyzed resume")} targetLabel={targetLabel} language={language} onReset={reset} onEdit={() => setResult(null)} />
+        <AtsReport key={language + targetText + targetMode} result={result} resumeText={resumeText} fileName={file?.name || (es ? "CV analizado" : "Analyzed resume")} targetLabel={targetLabel} versionName={versionName} language={language} onReset={reset} onEdit={() => setResult(null)} />
       </section>}
       <footer className="ats-focus-footer"><span>AlineaCV</span><p>{es ? "Mejora cómo presentas tu experiencia. Conserva lo que te hace único." : "Improve how you present your experience. Keep what makes you unique."}</p></footer>
     </main>

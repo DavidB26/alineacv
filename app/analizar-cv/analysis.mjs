@@ -58,6 +58,17 @@ const REQUIREMENT_GROUPS = [
   ["Figma", ["figma"]],
   ["Adobe Photoshop", ["photoshop", "adobe photoshop"]],
   ["Adobe Illustrator", ["illustrator", "adobe illustrator"]],
+  ["Adobe InDesign", ["indesign", "adobe indesign"]],
+  ["Adobe XD", ["adobe xd"]],
+  ["Adobe After Effects", ["after effects", "adobe after effects"]],
+  ["Blender", ["blender"]],
+  ["Procreate", ["procreate"]],
+  ["Contentstack", ["contentstack"]],
+  ["Branding", ["branding", "brand design", "diseno de marca"]],
+  ["Ilustración", ["ilustracion", "illustration"]],
+  ["Publicidad", ["publicidad", "advertising"]],
+  ["Edición de video", ["edicion de video", "video editing"]],
+  ["Diseño web", ["diseno web", "web design"]],
   ["UI/UX", ["ui/ux", "ux/ui", "user experience", "user interface"]],
   ["QA", ["quality assurance", "qa"]],
   ["Selenium", ["selenium"]],
@@ -111,6 +122,41 @@ const REQUIREMENT_GROUPS = [
   ["Operaciones", ["operaciones", "operations"]],
   ["Enfermería", ["enfermeria", "nursing"]],
   ["Atención al paciente", ["atencion al paciente", "patient care"]],
+  ["Derecho civil", ["derecho civil", "civil law"]],
+  ["Derecho laboral", ["derecho laboral", "labor law", "employment law"]],
+  ["Derecho corporativo", ["derecho corporativo", "corporate law"]],
+  ["Derecho penal", ["derecho penal", "criminal law"]],
+  ["Contratos", ["contratos", "contract drafting", "contract review", "contracts"]],
+  ["Litigios", ["litigios", "litigacion", "litigation"]],
+  ["Cumplimiento normativo", ["cumplimiento normativo", "compliance", "regulatory compliance"]],
+  ["Investigación jurídica", ["investigacion juridica", "legal research"]],
+  ["Redacción jurídica", ["redaccion juridica", "legal writing"]],
+  ["Debida diligencia", ["debida diligencia", "due diligence"]],
+  ["AutoCAD", ["autocad"]],
+  ["Revit", ["revit"]],
+  ["BIM", ["bim", "building information modeling"]],
+  ["SketchUp", ["sketchup"]],
+  ["Planos arquitectónicos", ["planos arquitectonicos", "architectural drawings"]],
+  ["Diseño arquitectónico", ["diseno arquitectonico", "architectural design"]],
+  ["Modelado 3D", ["modelado 3d", "diseno 3d", "3d modeling", "3d modelling", "3d design"]],
+  ["Renderizado", ["renderizado", "rendering"]],
+  ["Supervisión de obra", ["supervision de obra", "construction supervision", "site supervision"]],
+  ["Presupuesto de obra", ["presupuesto de obra", "cost estimation", "construction budgeting"]],
+  ["Diseño gráfico", ["diseno grafico", "graphic design"]],
+  ["Identidad visual", ["identidad visual", "visual identity", "brand identity"]],
+  ["Diseño editorial", ["diseno editorial", "editorial design"]],
+  ["Prototipado", ["prototipado", "prototyping"]],
+  ["Investigación de usuarios", ["investigacion de usuarios", "user research"]],
+  ["Accesibilidad", ["accesibilidad", "accessibility"]],
+  ["Gestión clínica", ["gestion clinica", "clinical management"]],
+  ["Historia clínica", ["historia clinica", "medical records", "clinical records"]],
+  ["Seguridad del paciente", ["seguridad del paciente", "patient safety"]],
+  ["Protocolos clínicos", ["protocolos clinicos", "clinical protocols"]],
+  ["Investigación", ["investigacion", "research"]],
+  ["Docencia", ["docencia", "teaching"]],
+  ["Redacción", ["redaccion", "writing", "copywriting"]],
+  ["Gestión documental", ["gestion documental", "document management"]],
+  ["Atención al detalle", ["atencion al detalle", "attention to detail"]],
   ["Comunicación", ["comunicacion", "communication"]],
   ["Liderazgo", ["liderazgo", "leadership"]],
   ["Trabajo en equipo", ["trabajo en equipo", "teamwork"]],
@@ -136,6 +182,34 @@ const ACTION_VERBS = [
   "design", "grow", "implement", "improve", "lead", "manage", "optimize", "reduce",
   "increased", "achieved", "analyzed", "automated", "built", "coordinated", "created", "developed",
   "designed", "grew", "implemented", "improved", "led", "managed", "optimized", "reduced",
+];
+
+const DIGIT_NUMBER = String.raw`\d+(?:[.,]\d+)?`;
+const SPANISH_NUMBER_WORD = String.raw`(?:
+  cero|un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|
+  diez|once|doce|trece|catorce|quince|dieciseis|diecisiete|dieciocho|diecinueve|
+  veinte|veintiuno|veintiuna|veintidos|veintitres|veinticuatro|veinticinco|veintiseis|veintisiete|veintiocho|veintinueve|
+  (?:treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|noventa)(?:\s+y\s+(?:un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve))?|
+  cien|ciento
+)`.replace(/\s+/g, "");
+const NUMBER_VALUE = `(?:${DIGIT_NUMBER}|${SPANISH_NUMBER_WORD})`;
+const MEASURABLE_UNIT = String.raw`(?:
+  por\s+ciento|percent|mil|k|millon(?:es)?|million(?:s)?|
+  segundos?|seconds?|minutos?|minutes?|horas?|hours?|dias?|days?|semanas?|weeks?|meses?|months?|
+  usuarios?|users?|clientes?|clients?|leads?|ventas?|sales|ingresos?|revenue|ahorros?|saved|
+  solicitudes?|requests?|tickets?|proyectos?|projects?|procesos?|processes?|componentes?|components?|
+  paginas?|pages?|equipos?|teams?|unidades?|units?
+)`.replace(/\s+/g, "");
+const METRIC_EXPRESSION = new RegExp([
+  String.raw`\bde\s+${NUMBER_VALUE}\s+a\s+${NUMBER_VALUE}(?:\s+${MEASURABLE_UNIT})?\b`,
+  String.raw`\b(?:el|la|al)\s+(?:doble|mitad)\b`,
+  String.raw`[$€£]\s*${DIGIT_NUMBER}`,
+  String.raw`\b${DIGIT_NUMBER}\s*%`,
+  String.raw`\b${NUMBER_VALUE}\s+${MEASURABLE_UNIT}\b`,
+].join("|"), "g");
+
+const OUTCOME_EXPRESSIONS = [
+  /\b(?:ahorro|crecimiento|conversion|eficiencia|impacto|mejora|reduccion|resultado|retencion|satisfaccion|saving|growth|conversion|efficiency|impact|improvement|reduction|result|retention|satisfaction)\w*\b/g,
 ];
 
 const copy = {
@@ -207,6 +281,10 @@ function countMatches(text, expressions) {
   return expressions.reduce((total, expression) => total + (text.match(expression)?.length ?? 0), 0);
 }
 
+function countMeasurableEvidence(value) {
+  return value.match(METRIC_EXPRESSION)?.length ?? 0;
+}
+
 function hasTerm(value, term) {
   const haystack = normalize(value).replace(/\.(?=\s|$)/g, " ");
   const escaped = normalize(term).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -248,8 +326,93 @@ function auditStatus(pass, warning = false) {
   return pass ? "pass" : warning ? "warning" : "fail";
 }
 
-function hasActionVerb(value) {
-  return ACTION_VERBS.some((verb) => new RegExp(`\\b${verb}\\b`).test(value));
+function requirementFromLabel(label) {
+  const known = REQUIREMENT_GROUPS.find(([knownLabel]) => knownLabel === label);
+  return known ? { label: known[0], aliases: known[1] } : { label, aliases: [label] };
+}
+
+function validateRuleText(value, requirements = []) {
+  const plain = normalize(value);
+  const actionVerbs = ACTION_VERBS.filter((verb) => new RegExp(`\\b${verb}\\b`).test(plain));
+  const metricCount = countMeasurableEvidence(plain);
+  const outcomeCount = countMatches(plain, OUTCOME_EXPRESSIONS);
+  const hasQuantifiedEvidence = /\d|%|[$€£]/.test(value) || metricCount > 0;
+  const matchedKeywords = requirements
+    .filter((requirement) => requirement.aliases.some((alias) => hasTerm(plain, alias)))
+    .map((requirement) => requirement.label);
+  return {
+    actionVerbs,
+    metricCount,
+    outcomeCount,
+    hasActionVerb: actionVerbs.length > 0,
+    hasMetric: metricCount > 0,
+    hasOutcome: outcomeCount > 0,
+    hasQuantifiedEvidence,
+    hasQuantifiedAction: actionVerbs.length > 0 && hasQuantifiedEvidence,
+    matchedKeywords,
+  };
+}
+
+export function validateResumeBullet(value, options = {}) {
+  const requirements = (options.keywords ?? []).map(requirementFromLabel);
+  return validateRuleText(value, requirements);
+}
+
+function check(id, group, weight, status, title, evidence, recommendation) {
+  return {
+    id,
+    group,
+    weight,
+    status,
+    points: status === "pass" ? weight : status === "warning" ? weight / 2 : 0,
+    title,
+    evidence,
+    recommendation,
+  };
+}
+
+function buildImpactChecks({ actionCount, metricCount, outcomeCount, quantifiedActionCount }, language) {
+  return [
+    check("action-verbs", "impact", 6, auditStatus(actionCount >= 3, actionCount >= 1),
+      localized(language, "Verbos de acción", "Action verbs"),
+      localized(language, `${actionCount} verbos de acción distintos fueron reconocidos.`, `${actionCount} distinct action verbs were recognized.`),
+      localized(language, "Inicia los logros con verbos concretos y variados.", "Start achievements with concrete, varied action verbs.")),
+    check("measured-results", "impact", 6, auditStatus(metricCount >= 2, metricCount >= 1),
+      localized(language, "Resultados medibles", "Measured results"),
+      localized(language, `${metricCount} resultados cuantificables fueron detectados.`, `${metricCount} measurable results were detected.`),
+      localized(language, "Añade cifras únicamente cuando puedas respaldarlas: porcentajes, volumen, tiempo o ahorro.", "Add figures only when supported: percentages, volume, time or savings.")),
+    check("outcome-language", "impact", 4, auditStatus(outcomeCount >= 2, outcomeCount >= 1),
+      localized(language, "Lenguaje de resultados", "Outcome language"),
+      localized(language, `${outcomeCount} referencias a resultados o impacto fueron detectadas.`, `${outcomeCount} references to outcomes or impact were detected.`),
+      localized(language, "Explica qué cambió gracias a tu trabajo sin inventar resultados.", "Explain what changed because of your work without inventing outcomes.")),
+    check("quantified-actions", "impact", 4, auditStatus(quantifiedActionCount >= 2, quantifiedActionCount >= 1),
+      localized(language, "Acciones con evidencia", "Evidence-backed actions"),
+      localized(language, `${quantifiedActionCount} líneas combinan una acción con una cifra.`, `${quantifiedActionCount} lines combine an action with a figure.`),
+      localized(language, "Conecta acciones y resultados comprobables en la misma viñeta.", "Connect actions and verifiable outcomes in the same bullet.")),
+  ];
+}
+
+function scoreAuditGroups(auditGroups, auditChecks) {
+  return auditGroups.map((group) => {
+    const checks = auditChecks.filter((item) => item.group === group.id);
+    const maximum = checks.reduce((total, item) => total + item.weight, 0);
+    const earned = checks.reduce((total, item) => total + item.points, 0);
+    return {
+      ...group,
+      score: Math.round((earned / maximum) * 100),
+      maximum: 100,
+      issueCount: checks.filter((item) => item.status !== "pass").length,
+      checks,
+    };
+  });
+}
+
+function keywordVerdict(score, language) {
+  return score === null
+    ? localized(language, "Sin coincidencia calculable", "No measurable keyword match")
+    : localized(language,
+      score >= 80 ? "Alta coincidencia de palabras clave" : score >= 50 ? "Coincidencia parcial de palabras clave" : "Baja coincidencia de palabras clave",
+      score >= 80 ? "High keyword match" : score >= 50 ? "Partial keyword match" : "Low keyword match");
 }
 
 export function analyzeResume(sourceText, jobDescription = "", language = "es", targetMode = "vacancy") {
@@ -267,8 +430,11 @@ export function analyzeResume(sourceText, jobDescription = "", language = "es", 
   const sections = Object.fromEntries(Object.entries(SECTION_PATTERNS).map(([key, pattern]) => [key, pattern.test(plain)]));
   const sectionCount = Object.values(sections).filter(Boolean).length;
   const dateCount = countMatches(plain, [/\b(?:19|20)\d{2}\b/g, /\b(?:ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic|jan|apr|aug|dec|actualidad|presente|present)\b/g]);
-  const actionCount = ACTION_VERBS.reduce((total, verb) => total + (new RegExp(`\\b${verb}\\b`).test(plain) ? 1 : 0), 0);
-  const metricCount = countMatches(plain, [/%/g, /[$€£]\s?\d/g, /\b\d+(?:[.,]\d+)?\s?(?:por ciento|percent|mil|k|millon|million|usuarios|users|clientes|clients|leads|ventas|sales|ingresos|revenue|ahorro|saved|horas|hours)\b/g]);
+  const jobKeywords = targetMode === "role" ? [] : keywordList(jobDescription);
+  const lineRuleResults = lines.map((line) => validateRuleText(line, jobKeywords));
+  const actionVerbCounts = Object.fromEntries(ACTION_VERBS.map((verb) => [verb, lineRuleResults.filter((rules) => rules.actionVerbs.includes(verb)).length]));
+  const actionCount = Object.values(actionVerbCounts).filter((count) => count > 0).length;
+  const metricCount = lineRuleResults.reduce((total, rules) => total + rules.metricCount, 0);
   const bulletCount = lines.filter((line) => /^[-•*▪‣]/.test(line)).length;
   const firstPersonCount = countMatches(plain, [/\b(?:yo|mio|mia|mi|i|my|mine)\b/g]);
   const unusualCount = text.replace(/[\p{L}\p{N}\s.,;:!?@%+&/()#'’"–—-]/gu, "").length;
@@ -277,22 +443,8 @@ export function analyzeResume(sourceText, jobDescription = "", language = "es", 
   const lineFrequency = comparableLines.reduce((frequencies, line) => frequencies.set(line, (frequencies.get(line) ?? 0) + 1), new Map());
   const duplicateCount = Array.from(lineFrequency.values()).reduce((total, frequency) => total + Math.max(0, frequency - 1), 0);
   const denseLineCount = lines.filter((line) => line.length > 220 || line.split(/\s+/).length > 38).length;
-  const outcomeCount = countMatches(plain, [/\b(?:ahorro|crecimiento|conversion|eficiencia|impacto|mejora|reduccion|resultado|retencion|satisfaccion|saving|growth|conversion|efficiency|impact|improvement|reduction|result|retention|satisfaction)\w*\b/g]);
-  const quantifiedActionCount = lines.filter((line) => {
-    const normalizedLine = normalize(line);
-    return hasActionVerb(normalizedLine) && /\d|%|[$€£]/.test(line);
-  }).length;
-
-  const check = (id, group, weight, status, title, evidence, recommendation) => ({
-    id,
-    group,
-    weight,
-    status,
-    points: status === "pass" ? weight : status === "warning" ? weight / 2 : 0,
-    title,
-    evidence,
-    recommendation,
-  });
+  const outcomeCount = lineRuleResults.reduce((total, rules) => total + rules.outcomeCount, 0);
+  const quantifiedActionCount = lineRuleResults.filter((rules) => rules.hasQuantifiedAction).length;
 
   const auditChecks = [
     check("extractable-text", "parsing", 5, auditStatus(wordCount >= 120, wordCount >= 60),
@@ -354,22 +506,7 @@ export function analyzeResume(sourceText, jobDescription = "", language = "es", 
       localized(language, `${denseLineCount} líneas excesivamente densas fueron detectadas.`, `${denseLineCount} overly dense lines were detected.`),
       localized(language, "Divide párrafos extensos en logros o responsabilidades concretas.", "Split long paragraphs into concrete achievements or responsibilities.")),
 
-    check("action-verbs", "impact", 6, auditStatus(actionCount >= 3, actionCount >= 1),
-      localized(language, "Verbos de acción", "Action verbs"),
-      localized(language, `${actionCount} verbos de acción distintos fueron reconocidos.`, `${actionCount} distinct action verbs were recognized.`),
-      localized(language, "Inicia los logros con verbos concretos y variados.", "Start achievements with concrete, varied action verbs.")),
-    check("measured-results", "impact", 6, auditStatus(metricCount >= 2, metricCount >= 1),
-      localized(language, "Resultados medibles", "Measured results"),
-      localized(language, `${metricCount} resultados cuantificables fueron detectados.`, `${metricCount} measurable results were detected.`),
-      localized(language, "Añade cifras únicamente cuando puedas respaldarlas: porcentajes, volumen, tiempo o ahorro.", "Add figures only when supported: percentages, volume, time or savings.")),
-    check("outcome-language", "impact", 4, auditStatus(outcomeCount >= 2, outcomeCount >= 1),
-      localized(language, "Lenguaje de resultados", "Outcome language"),
-      localized(language, `${outcomeCount} referencias a resultados o impacto fueron detectadas.`, `${outcomeCount} references to outcomes or impact were detected.`),
-      localized(language, "Explica qué cambió gracias a tu trabajo sin inventar resultados.", "Explain what changed because of your work without inventing outcomes.")),
-    check("quantified-actions", "impact", 4, auditStatus(quantifiedActionCount >= 2, quantifiedActionCount >= 1),
-      localized(language, "Acciones con evidencia", "Evidence-backed actions"),
-      localized(language, `${quantifiedActionCount} líneas combinan una acción con una cifra.`, `${quantifiedActionCount} lines combine an action with a figure.`),
-      localized(language, "Conecta acciones y resultados comprobables en la misma viñeta.", "Connect actions and verifiable outcomes in the same bullet.")),
+    ...buildImpactChecks({ actionCount, metricCount, outcomeCount, quantifiedActionCount }, language),
 
     check("email-contact", "contact", 6, auditStatus(hasEmail),
       localized(language, "Correo electrónico", "Email address"),
@@ -392,19 +529,7 @@ export function analyzeResume(sourceText, jobDescription = "", language = "es", 
     ["impact", localized(language, "Impacto", "Impact")],
     ["contact", localized(language, "Contacto", "Contact")],
   ];
-  const auditGroups = auditGroupDefinitions.map(([id, label]) => {
-    const checks = auditChecks.filter((item) => item.group === id);
-    const maximum = checks.reduce((total, item) => total + item.weight, 0);
-    const earned = checks.reduce((total, item) => total + item.points, 0);
-    return {
-      id,
-      label,
-      score: Math.round((earned / maximum) * 100),
-      maximum: 100,
-      issueCount: checks.filter((item) => item.status !== "pass").length,
-      checks,
-    };
-  });
+  const auditGroups = scoreAuditGroups(auditGroupDefinitions.map(([id, label]) => ({ id, label })), auditChecks);
   const atsQualityScore = Math.max(0, Math.min(100, Math.round(auditChecks.reduce((total, item) => total + item.points, 0))));
 
   const issues = [];
@@ -432,8 +557,8 @@ export function analyzeResume(sourceText, jobDescription = "", language = "es", 
   if (wordCount >= 250 && wordCount <= 900) strengths.push(copy[language].strengths.length);
 
   // A title names an objective, not the requirements of a specific employer.
-  const jobKeywords = targetMode === "role" ? [] : keywordList(jobDescription);
-  const matchedRequirements = jobKeywords.filter((requirement) => requirement.aliases.some((alias) => hasTerm(plain, alias)));
+  const keywordCounts = Object.fromEntries(jobKeywords.map((requirement) => [requirement.label, lineRuleResults.filter((rules) => rules.matchedKeywords.includes(requirement.label)).length]));
+  const matchedRequirements = jobKeywords.filter((requirement) => keywordCounts[requirement.label] > 0);
   const matched = matchedRequirements.map((requirement) => requirement.label);
   const missing = jobKeywords.filter((requirement) => !matchedRequirements.includes(requirement)).map((requirement) => requirement.label);
   const matchScore = jobKeywords.length ? Math.round((matched.length / jobKeywords.length) * 100) : null;
@@ -442,11 +567,7 @@ export function analyzeResume(sourceText, jobDescription = "", language = "es", 
   // Job matching stays separate from the document-quality checks. A missing
   // vacancy or unrecognized requirements must never produce a generic match.
   const score = matchScore;
-  const verdict = score === null
-    ? localized(language, "Sin coincidencia calculable", "No measurable keyword match")
-    : localized(language,
-      score >= 80 ? "Alta coincidencia de palabras clave" : score >= 50 ? "Coincidencia parcial de palabras clave" : "Baja coincidencia de palabras clave",
-      score >= 80 ? "High keyword match" : score >= 50 ? "Partial keyword match" : "Low keyword match");
+  const verdict = keywordVerdict(score, language);
 
   return {
     targetMode,
@@ -468,5 +589,70 @@ export function analyzeResume(sourceText, jobDescription = "", language = "es", 
       passedCount: auditChecks.filter((item) => item.status === "pass").length,
     },
     keywordMatch: jobKeywords.length ? { score: matchScore, matched, missing } : null,
+    ruleSnapshot: {
+      actionVerbCounts,
+      metricCount,
+      outcomeCount,
+      quantifiedActionCount,
+      jobKeywords: jobKeywords.map((requirement) => requirement.label),
+      keywordCounts,
+    },
+  };
+}
+
+export function applyResumeBulletEdits(result, edits, language = "es") {
+  if (!result.ruleSnapshot || !edits.length) return result;
+
+  const snapshot = result.ruleSnapshot;
+  const requirements = snapshot.jobKeywords.map(requirementFromLabel);
+  const actionVerbCounts = { ...snapshot.actionVerbCounts };
+  const keywordCounts = { ...snapshot.keywordCounts };
+  let metricCount = snapshot.metricCount;
+  let outcomeCount = snapshot.outcomeCount;
+  let quantifiedActionCount = snapshot.quantifiedActionCount;
+
+  for (const edit of edits) {
+    const original = validateRuleText(edit.originalText, requirements);
+    const current = validateRuleText(edit.currentText, requirements);
+    metricCount += current.metricCount - original.metricCount;
+    outcomeCount += current.outcomeCount - original.outcomeCount;
+    quantifiedActionCount += Number(current.hasQuantifiedAction) - Number(original.hasQuantifiedAction);
+
+    for (const verb of ACTION_VERBS) {
+      actionVerbCounts[verb] += Number(current.actionVerbs.includes(verb)) - Number(original.actionVerbs.includes(verb));
+    }
+    for (const keyword of snapshot.jobKeywords) {
+      keywordCounts[keyword] += Number(current.matchedKeywords.includes(keyword)) - Number(original.matchedKeywords.includes(keyword));
+    }
+  }
+
+  metricCount = Math.max(0, metricCount);
+  outcomeCount = Math.max(0, outcomeCount);
+  quantifiedActionCount = Math.max(0, quantifiedActionCount);
+  const actionCount = Object.values(actionVerbCounts).filter((count) => count > 0).length;
+  const liveImpactChecks = buildImpactChecks({ actionCount, metricCount, outcomeCount, quantifiedActionCount }, language);
+  const impactById = new Map(liveImpactChecks.map((item) => [item.id, item]));
+  const auditChecks = result.auditGroups.flatMap((group) => group.checks).map((item) => impactById.get(item.id) ?? item);
+  const auditGroups = scoreAuditGroups(result.auditGroups.map(({ id, label }) => ({ id, label })), auditChecks);
+  const atsQualityScore = Math.max(0, Math.min(100, Math.round(auditChecks.reduce((total, item) => total + item.points, 0))));
+
+  const matched = snapshot.jobKeywords.filter((keyword) => keywordCounts[keyword] > 0);
+  const missing = snapshot.jobKeywords.filter((keyword) => keywordCounts[keyword] <= 0);
+  const score = snapshot.jobKeywords.length ? Math.round((matched.length / snapshot.jobKeywords.length) * 100) : null;
+
+  return {
+    ...result,
+    score,
+    atsQualityScore,
+    verdict: keywordVerdict(score, language),
+    categories: auditGroups.map(({ label, score: categoryScore, maximum }) => ({ label, score: categoryScore, maximum })),
+    auditGroups,
+    metrics: {
+      ...result.metrics,
+      metricCount,
+      actionCount,
+      passedCount: auditChecks.filter((item) => item.status === "pass").length,
+    },
+    keywordMatch: snapshot.jobKeywords.length ? { score, matched, missing } : null,
   };
 }

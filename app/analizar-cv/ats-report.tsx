@@ -5,8 +5,8 @@ import ResumeImprovementPlan from "./resume-improvement-plan";
 
 const dictionary = {
   es: {
-    score: "Coincidencia de palabras clave",
-    estimate: "Estimación por palabras clave; no garantiza selección.",
+    score: "Coincidencia actual del CV",
+    estimate: "Calculada solo con el CV que subiste; los proyectos sugeridos no inflan este porcentaje.",
     unavailable: "Sin puntaje calculable",
     unavailableHelp: "No identificamos requisitos concretos. Pega una descripción más completa.",
     technical: "Ver detalle técnico ATS",
@@ -27,8 +27,8 @@ const dictionary = {
     builder: "Abrir creador de CV",
   },
   en: {
-    score: "Keyword match",
-    estimate: "Keyword-based estimate; selection is not guaranteed.",
+    score: "Current resume match",
+    estimate: "Calculated only from the resume you uploaded; suggested projects do not inflate this percentage.",
     unavailable: "No measurable score",
     unavailableHelp: "No concrete requirements were identified. Paste a fuller description.",
     technical: "View technical ATS details",
@@ -50,19 +50,22 @@ const dictionary = {
   },
 } as const;
 
-export default function AtsReport({ result, resumeText, fileName, targetLabel, language, onReset, onEdit }: {
+export default function AtsReport({ result, resumeText, fileName, targetLabel, versionName, language, onReset, onEdit }: {
   result: ReturnType<typeof analyzeResume>;
   resumeText: string;
   fileName: string;
   targetLabel: string;
+  versionName: string;
   language: "es" | "en";
   onReset: () => void;
   onEdit: () => void;
 }) {
+  const liveResult = result;
   const copy = dictionary[language];
   const es = language === "es";
-  const roleOnly = result.targetMode === "role";
-  const scoreState = result.score === null ? "unknown" : result.score >= 80 ? "good" : result.score >= 50 ? "review" : "priority";
+  const roleOnly = liveResult.targetMode === "role";
+  const scoreState = liveResult.score === null ? "unknown" : liveResult.score >= 80 ? "good" : liveResult.score >= 50 ? "review" : "priority";
+
   return (
     <div className="ats-results ats-compact-report" id="ats-result-summary" tabIndex={-1}>
       <p className="ats-report-context" aria-label={es ? "Contexto analizado" : "Analyzed context"}>
@@ -70,28 +73,32 @@ export default function AtsReport({ result, resumeText, fileName, targetLabel, l
       </p>
       <div className="ats-answer-grid">
         <div className="ats-evidence-column">
-          <section className={`ats-match-card ${scoreState}`} aria-labelledby="match-heading">
+          <section className={`ats-match-card ${scoreState}`} aria-labelledby="match-heading" aria-live="polite">
             <p id="match-heading">{roleOnly ? (es ? "Tu puesto objetivo" : "Your target role") : copy.score}</p>
-            <div className={roleOnly ? "ats-role-name" : "ats-match-number"}><strong>{roleOnly ? result.targetRole : result.score ?? "—"}</strong>{!roleOnly && result.score !== null && <span>%</span>}</div>
-            <h1 className="ats-match-status">{roleOnly ? (es ? "Tu revisión inicial está lista" : "Your first review is ready") : result.score === null ? copy.unavailable : result.verdict}</h1>
-            <small>{roleOnly ? (es ? "Orientación de contenido y estructura. Añade una convocatoria para comparar requisitos concretos." : "Content and structure guidance. Add a job description to compare concrete requirements.") : result.score === null ? copy.unavailableHelp : copy.estimate}</small>
-            {!roleOnly && result.score !== null && <div className="ats-score-guide">
+            <div className={roleOnly ? "ats-role-name" : "ats-match-number"}><strong>{roleOnly ? liveResult.targetRole : liveResult.score ?? "—"}</strong>{!roleOnly && liveResult.score !== null && <span>%</span>}</div>
+            <h1 className="ats-match-status">{roleOnly ? (es ? "Tu revisión inicial está lista" : "Your first review is ready") : liveResult.score === null ? copy.unavailable : liveResult.verdict}</h1>
+            <small>{roleOnly ? (es ? "Orientación de contenido y estructura. Añade una convocatoria para comparar requisitos concretos." : "Content and structure guidance. Add a job description to compare concrete requirements.") : liveResult.score === null ? copy.unavailableHelp : copy.estimate}</small>
+            {!roleOnly && liveResult.score !== null && <div className="ats-score-guide">
               <span>{copy.scoreGuide}</span>
-              <div className="ats-score-scale"><i style={{ left: `${result.score}%` }} /></div>
+              <div className="ats-score-scale"><i style={{ left: `${liveResult.score}%` }} /></div>
               <div>{copy.scoreRanges.map((range) => <small key={range}>{range}</small>)}</div>
             </div>}
+            <div className="ats-live-quality">
+              <header><span>{es ? "Calidad del documento" : "Document quality"}</span><strong>{liveResult.atsQualityScore}%</strong></header>
+              <ul>{liveResult.categories.map((category) => <li className={category.score >= 80 ? "good" : category.score >= 50 ? "review" : "priority"} key={category.label}><span>{category.label}</span><strong>{category.score}%</strong></li>)}</ul>
+            </div>
           </section>
 
-          {!roleOnly && result.keywordMatch && <section className="ats-visible-keywords" aria-labelledby="keyword-evidence-title">
+          {!roleOnly && liveResult.keywordMatch && <section className="ats-visible-keywords" aria-labelledby="keyword-evidence-title" aria-live="polite">
             <h2 id="keyword-evidence-title">{copy.keywords}</h2>
             <p>{es ? "Esto explica el porcentaje. Encontrar el término no demuestra por sí solo el nivel de experiencia." : "This explains the percentage. Finding a term alone does not prove the level of experience."}</p>
             <div>
-              {result.keywordMatch.matched.map((keyword) => <span className="matched" aria-label={`${keyword}: ${copy.matched}`} key={`matched-${keyword}`}><b aria-hidden="true">✓</b>{keyword}</span>)}
-              {result.keywordMatch.missing.map((keyword) => <span className="missing" aria-label={`${keyword}: ${copy.missing}`} key={`missing-${keyword}`}><b aria-hidden="true">×</b>{keyword}</span>)}
+              {liveResult.keywordMatch.matched.map((keyword) => <span className="matched" aria-label={`${keyword}: ${copy.matched}`} key={`matched-${keyword}`}><b aria-hidden="true">✓</b>{keyword}</span>)}
+              {liveResult.keywordMatch.missing.map((keyword) => <span className="missing" aria-label={`${keyword}: ${copy.missing}`} key={`missing-${keyword}`}><b aria-hidden="true">×</b>{keyword}</span>)}
             </div>
           </section>}
         </div>
-        <ResumeImprovementPlan result={result} resumeText={resumeText} language={language} onReanalyze={onReset} />
+        <ResumeImprovementPlan result={result} originalResumeText={resumeText} fileName={fileName} targetLabel={targetLabel} versionName={versionName} language={language} />
       </div>
 
       <details className="ats-technical-details">
@@ -99,7 +106,7 @@ export default function AtsReport({ result, resumeText, fileName, targetLabel, l
         <div className="ats-technical-content">
           <p className="ats-score-explanation">{roleOnly ? (es ? "Revisamos el documento. Sin una convocatoria, no evaluamos los requisitos del empleador ni calculamos compatibilidad con un puesto." : "We review the document. Without a job description, we cannot assess employer requirements or calculate a job match.") : copy.method}</p>
           <div className="ats-technical-groups">
-            {result.auditGroups.map((group) => {
+            {liveResult.auditGroups.map((group) => {
               const issues = group.checks.filter((audit) => audit.status !== "pass");
               const correct = group.checks.filter((audit) => audit.status === "pass");
               const correctLabel = es
@@ -136,7 +143,7 @@ export default function AtsReport({ result, resumeText, fileName, targetLabel, l
               </section>;
             })}
           </div>
-          {result.strengths.length > 0 && <section className="ats-technical-strengths"><h2>{copy.strengths}</h2><ul>{result.strengths.map((strength) => <li key={strength}>{strength}</li>)}</ul></section>}
+          {liveResult.strengths.length > 0 && <section className="ats-technical-strengths"><h2>{copy.strengths}</h2><ul>{liveResult.strengths.map((strength) => <li key={strength}>{strength}</li>)}</ul></section>}
         </div>
       </details>
 
