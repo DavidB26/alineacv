@@ -55,9 +55,56 @@ test("compares concrete job requirements instead of advertisement filler words",
   const result = analyzeResume(resume, vacancy, "es");
 
   assert.deepEqual(result.keywordMatch?.matched, ["JavaScript", "React", "HTML"]);
-  assert.deepEqual(result.keywordMatch?.missing, ["API", "REST"]);
-  assert.equal(result.keywordMatch?.score, 60);
+  assert.deepEqual(result.keywordMatch?.missing, ["API REST"]);
+  assert.equal(result.keywordMatch?.score, 75);
   assert.doesNotMatch(JSON.stringify(result.keywordMatch), /consumiendo|dominas|tienes|lugar/i);
+});
+
+test("understands alternatives, compound skills and eligibility requirements in a full vacancy", () => {
+  const resume = `David Beslanga
+51 999 999 999 | david@example.com | Lima, Perú
+8 años de experiencia en desarrollo frontend.
+EXPERIENCIA PROFESIONAL
+• Implementar componentes responsive y reutilizables con React y TypeScript.
+HABILIDADES
+Frontend: HTML5, CSS3, TypeScript, React y Responsive Design. | Herramientas: Git y GitHub.
+FORMACIÓN ACADÉMICA
+Bachiller en Ingeniería de Sistemas
+IDIOMAS
+Inglés: intermedio`;
+  const vacancy = `Estudios técnicos y/o universitarios completos en Ingeniería de Sistemas o afines.
+Inglés C1 avanzado. Residencia en cualquier provincia del Perú. +6 años de experiencia en desarrollo Front-End.
+Experiencia sólida con React o Angular. Dominio de TypeScript, HTML5, CSS3 y Responsive Design.
+Experiencia desarrollando dashboards orientados a datos e integrando aplicaciones con APIs REST.
+Conceptos BI: KPIs, filtros, drill-down y datos gobernados.
+Componentes reutilizables y arquitecturas frontend escalables. Git, testing y code review.
+Herramientas de desarrollo asistidas por IA como GitHub Copilot, ChatGPT o Claude.`;
+  const result = analyzeResume(resume, vacancy, "es");
+
+  assert.ok(result.keywordMatch.matched.includes("React o Angular"));
+  assert.ok(result.keywordMatch.matched.includes("Arquitectura frontend escalable"));
+  assert.ok(result.keywordMatch.missing.includes("API REST"));
+  assert.ok(result.keywordMatch.missing.includes("Dashboards y KPIs"));
+  assert.ok(result.keywordMatch.missing.includes("Desarrollo asistido por IA"));
+  assert.ok(!result.keywordMatch.missing.includes("Angular"));
+  assert.ok(!result.keywordMatch.missing.includes("C1"));
+  assert.ok(!result.keywordMatch.missing.includes("IA"));
+  assert.ok(!result.keywordMatch.projectMissing.includes("Inglés C1"));
+  assert.deepEqual(result.keywordMatch.nonProjectMissing, ["Inglés C1"]);
+  assert.equal(result.eligibilityChecks.find((item) => item.id === "eligibility-english").status, "missing");
+  assert.equal(result.eligibilityChecks.find((item) => item.id === "eligibility-experience").status, "matched");
+  assert.equal(result.eligibilityChecks.find((item) => item.id === "eligibility-education").status, "matched");
+  assert.equal(result.eligibilityChecks.find((item) => item.id === "eligibility-location").status, "matched");
+});
+
+test("collapses overlapping UX and research requirements before calculating the score", () => {
+  const resume = "Diseñadora gráfica con experiencia en Figma y branding.";
+  const vacancy = "Requisitos: UI/UX, UX, UI, investigación de usuarios, investigación, comunicación, Figma y branding.";
+  const result = analyzeResume(resume, vacancy, "es");
+
+  assert.deepEqual(result.keywordMatch.matched, ["Figma", "Branding"]);
+  assert.deepEqual(result.keywordMatch.missing, ["UI/UX", "Investigación de usuarios", "Comunicación"]);
+  assert.equal(result.keywordMatch.score, 40);
 });
 
 

@@ -112,12 +112,15 @@ test("automatically adds missing requirements as projects and offers the complet
   assert.match(html, /Coincidencia actual del CV/);
   assert.match(html, /camila-cv\.pdf/);
   assert.match(html, /Desarrollador frontend/);
-  assert.match(html, /Proyectos para cubrir las brechas/);
+  assert.match(html, /Proyecto independiente para esta oferta/);
   assert.doesNotMatch(html, /Volver a analizar/);
   assert.match(html, /Descargar CV completo en PDF/);
   assert.match(html, /Copiar CV completo/);
-  assert.match(html, /Esto se añadirá al CV descargable/);
-  assert.match(html, /Proyecto técnico con Docker/);
+  assert.match(html, /Proyecto completo recomendado/);
+  assert.match(html, /Sistema de gestión de incidencias con SLA/);
+  assert.match(html, /Qué debe incluir/);
+  assert.match(html, /Qué debes poder enseñar/);
+  assert.match(html, /Versión breve que irá al CV/);
   assert.match(html, /Tu CV actual tiene 67% de coincidencia/);
   assert.doesNotMatch(html, /Usar este borrador|Confirmo que puedo respaldarlo e incluirlo|Versión guardada/);
   assert.doesNotMatch(html, /<textarea/);
@@ -133,15 +136,29 @@ test("automatically adds missing requirements as projects and offers the complet
   assert.doesNotMatch(html, /Ver vacantes similares|Abrir creador de CV/);
   assert.doesNotMatch(html, /<details[^>]*\bopen(?:=|\s|>)/);
   const technical = html.indexOf('<details class="ats-technical-details"');
-  assert.ok(html.indexOf("Proyectos para cubrir las brechas") < technical);
+  assert.ok(html.indexOf("Proyecto independiente para esta oferta") < technical);
   assert.ok(html.indexOf("Palabras clave de la vacante") < technical);
   for (const group of result.auditGroups) assert.ok(html.indexOf(`<h2>${group.label}</h2>`) > technical);
   assert.ok(html.indexOf("ats-audit-checks") < html.indexOf("ats-passed-checks"));
   assert.match(html, /class="ats-passed-check"/);
   assert.doesNotMatch(html, /0 por revisar/);
-  assert.match(html, /La descarga conserva tu experiencia original y añade estos proyectos/);
+  assert.match(html, /La descarga conserva tu experiencia original y añade únicamente la versión breve/);
   assert.doesNotMatch(html, /<form|Puesto que buscas|Habilidades para la búsqueda|ats-report-sidebar/);
   assert.doesNotMatch(html, /similar-remote-title/);
+});
+
+test("renders eligibility requirements outside the suggested project", () => {
+  const fullVacancy = `${vacancy}\nInglés C1 avanzado. +6 años de experiencia. Estudios universitarios completos. Residencia en Perú.`;
+  const result = analyzeResume(resume, fullVacancy, "es");
+  const html = renderToStaticMarkup(createElement(AtsReport, { result, resumeText: resume, fileName: "camila-cv.pdf", targetLabel: "Desarrollador frontend", versionName: "CV - Desarrollador frontend", language: "es", onReset() {}, onEdit() {} }));
+
+  assert.match(html, /Requisitos que un proyecto no reemplaza/);
+  assert.match(html, /Los separamos de las habilidades técnicas/);
+  assert.match(html, /Inglés C1/);
+  assert.match(html, /No acreditado/);
+  assert.match(html, /El CV declara nivel INTERMEDIO/);
+  const projectCard = html.slice(html.indexOf("automatic-project-card"), html.indexOf("resume-export-actions"));
+  assert.doesNotMatch(projectCard, /Inglés C1/);
 });
 
 test("does not render an invented percentage when requirements cannot be identified", () => {
@@ -149,7 +166,7 @@ test("does not render an invented percentage when requirements cannot be identif
   const html = renderToStaticMarkup(createElement(AtsReport, { result, resumeText: resume, fileName: "camila-cv.pdf", targetLabel: "Frontend developer", versionName: "CV - Frontend developer", language: "en", onReset() {}, onEdit() {} }));
   assert.match(html, /No measurable score/);
   assert.match(html, /<div class="ats-match-number"><strong>—<\/strong><\/div>/);
-  assert.match(html, /Projects to close the gaps/);
+  assert.match(html, /Independent project for this role/);
 });
 
 test("job-title guidance does not invent a job score or employer requirements", () => {

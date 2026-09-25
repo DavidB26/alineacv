@@ -66,15 +66,32 @@ export function plausibleTarget(value) {
   return text;
 }
 
+function normalizeProfessionalHeadline(value) {
+  const text = clean(value)
+    .replace(/^(?:soy|i am)\s+/i, "")
+    .replace(/\s+(?:y actualmente|actualmente|con m[aá]s de|con experiencia|que actualmente)\b.*$/i, "")
+    .replace(/[.,;:]+$/, "")
+    .trim();
+  if (!text || !PROFESSION.test(text)) return "";
+  return text.charAt(0).toLocaleUpperCase("es") + text.slice(1);
+}
+
 export function inferResumeHeadline(sourceText, requestedTarget = "", header = [], name = "") {
-  const target = plausibleTarget(requestedTarget);
-  if (target) return target;
   const headerCandidate = header.find((line) => plain(line) !== plain(name) && PROFESSION.test(line) && !CONTACT_LIKE.test(line));
-  if (headerCandidate) return clean(headerCandidate);
+  if (headerCandidate) {
+    const normalized = normalizeProfessionalHeadline(headerCandidate);
+    if (normalized) return normalized;
+  }
   const matches = [...clean(sourceText).matchAll(/\bsoy\s+([^.;]{3,100})/giu)].map((match) => match[1]);
   const professional = matches.find((value) => PROFESSION.test(value));
-  if (professional) return clean(professional).replace(/\s+y actualmente\b.*$/i, "").replace(/\s+con m[aá]s de\b.*$/i, "");
-  return header.find((line) => plausibleTarget(line) && plain(line) !== plain(name) && !CONTACT_LIKE.test(line) && !GENERIC_LABEL.test(line)) || "CV profesional";
+  if (professional) {
+    const normalized = normalizeProfessionalHeadline(professional);
+    if (normalized) return normalized;
+  }
+  const target = plausibleTarget(requestedTarget);
+  if (target) return target;
+  const fallback = header.find((line) => plausibleTarget(line) && plain(line) !== plain(name) && !CONTACT_LIKE.test(line) && !GENERIC_LABEL.test(line));
+  return normalizeProfessionalHeadline(fallback) || fallback || "CV profesional";
 }
 
 export function extractResumeContacts(sourceText) {
@@ -220,14 +237,32 @@ function canonicalTool(value) {
 }
 
 export function skillBlocks(lines, language = "es") {
+  const grouped = new Map();
   const tools = [];
   const competencies = [];
   for (const original of lines.map(clean).filter(Boolean)) {
     if (CONTACT_LIKE.test(original) || /^(?:tel[eé]fono|email|behance porta)$/i.test(original)) continue;
+    const segments = original.split("|").map(clean).filter(Boolean);
+    let activeLabel = "";
+    let categorized = false;
+    for (const segment of segments) {
+      const labeled = segment.match(/^([^:]{2,42}):\s*(.+)$/);
+      if (labeled) {
+        activeLabel = clean(labeled[1]);
+        const current = grouped.get(activeLabel) ?? [];
+        current.push(canonicalTool(labeled[2]));
+        grouped.set(activeLabel, current);
+        categorized = true;
+      } else if (activeLabel) {
+        grouped.get(activeLabel).push(canonicalTool(segment));
+        categorized = true;
+      }
+    }
+    if (categorized) continue;
     if (TOOL_PATTERN.test(original) && !original.includes(" - ")) tools.push(canonicalTool(original));
     else competencies.push(original.replace(/\s*-\s*/g, ", ").replace(/,\s*$/, ""));
   }
-  const blocks = [];
+  const blocks = [...grouped.entries()].map(([label, values]) => ({ type: "row", label, value: unique(values).join(" | ") }));
   if (tools.length) blocks.push({ type: "row", label: language === "es" ? "Herramientas" : "Tools", value: unique(tools).join(" | ") });
   if (competencies.length) blocks.push({ type: "row", label: language === "es" ? "Competencias" : "Strengths", value: unique(competencies).join(" | ") });
   return blocks;

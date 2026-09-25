@@ -30,23 +30,32 @@ function cleanTarget(value, language = "es") {
   return explicitTarget(value) || fallback;
 }
 
-const DOMAIN_PATTERNS = [
-  ["legal", /\b(abogad\w*|derecho|legal|litig\w*|contrat\w*|jurid\w*|compliance|cumplimiento|fiscal|penal|civil)\b/i],
-  ["architecture", /\b(arquitect\w*|autocad|revit|bim|obra|construccion|planos?|urbanismo|sketchup)\b/i],
-  ["health", /\b(medic\w*|enfermer\w*|clinica|paciente|salud|hospital|terapia|farmac\w*)\b/i],
-  ["marketing", /\b(marketing|seo|sem|campan\w*|contenido|social media|publicidad|ads|marca)\b/i],
-  ["finance", /\b(contab\w*|finanz\w*|auditor\w*|impuesto|presupuesto|tesorer\w*|niif|ifrs)\b/i],
-  ["operations", /\b(logistica|operaciones|inventario|compras|supply chain|calidad|produccion)\b/i],
-  ["software", /\b(desarroll\w*|software|frontend|backend|fullstack|program\w*|javascript|typescript|react|angular|python|api|sql|devops)\b/i],
-  ["design", /\b(disen\w*|designer|figma|photoshop|illustrator|indesign|ux|ui|branding|identidad visual)\b/i],
+const DOMAIN_SIGNALS = [
+  { domain: "legal", profession: /\b(?:abogad\w*|asesor\w+ legal|jurista)\b/gi, related: /\b(?:derecho|legal|litig\w*|contrat\w*|jurid\w*|compliance|cumplimiento|fiscal|penal|civil)\b/gi },
+  { domain: "architecture", profession: /\b(?:arquitect\w*|urbanista)\b/gi, related: /\b(?:autocad|revit|bim|obra|construccion|planos?|urbanismo|sketchup)\b/gi },
+  { domain: "health", profession: /\b(?:medic\w*|enfermer\w*|psicolog\w*|terapeut\w*|farmaceut\w*)\b/gi, related: /\b(?:clinica|paciente|salud|hospital|terapia|farmac\w*)\b/gi },
+  { domain: "marketing", profession: /\b(?:especialista en marketing|mercadolog\w*|publicista|community manager)\b/gi, related: /\b(?:marketing|seo|sem|campan\w*|contenido|social media|publicidad|ads|marca)\b/gi },
+  { domain: "finance", profession: /\b(?:contador\w*|auditor\w*|analista financier\w*|economista)\b/gi, related: /\b(?:contab\w*|finanz\w*|impuesto|presupuesto|tesorer\w*|niif|ifrs)\b/gi },
+  { domain: "operations", profession: /\b(?:especialista en operaciones|jefe de operaciones|ingenier\w+ industrial|logistic\w*)\b/gi, related: /\b(?:logistica|operaciones|inventario|compras|supply chain|calidad|produccion)\b/gi },
+  { domain: "software", profession: /\b(?:desarrollador\w*|programador\w*|ingenier\w+ de software|software engineer|frontend developer|backend developer|full ?stack)\b/gi, related: /\b(?:software|frontend|backend|javascript|typescript|react|angular|python|api|sql|devops)\b/gi },
+  { domain: "design", profession: /\b(?:disenador\w*|designer|director\w+ de arte|ux designer|ui designer)\b/gi, related: /\b(?:diseno|figma|photoshop|illustrator|indesign|after effects|blender|3d max|ux|ui|branding|identidad visual|ilustracion)\b/gi },
 ];
 
+function signalCount(value, pattern) {
+  return [...value.matchAll(pattern)].length;
+}
+
 export function inferProfessionalDomain(sourceText, targetLabel = "") {
-  const normalizedTarget = normalize(targetLabel);
-  const targetDomain = DOMAIN_PATTERNS.find(([, pattern]) => pattern.test(normalizedTarget))?.[0];
-  if (targetDomain) return targetDomain;
-  const haystack = normalize(sourceText);
-  return DOMAIN_PATTERNS.find(([, pattern]) => pattern.test(haystack))?.[0] ?? "general";
+  const source = normalize(sourceText);
+  const target = normalize(targetLabel);
+  const ranked = DOMAIN_SIGNALS.map((signal, index) => ({
+    domain: signal.domain,
+    index,
+    professionScore: Math.min(1, signalCount(source, signal.profession)) * 20 + Math.min(1, signalCount(target, signal.profession)) * 40,
+    relatedScore: signalCount(source, signal.related) * 2 + signalCount(target, signal.related) * 3,
+  })).sort((a, b) => b.professionScore - a.professionScore || b.relatedScore - a.relatedScore || a.index - b.index);
+  const best = ranked[0];
+  return best && (best.professionScore || best.relatedScore) ? best.domain : "general";
 }
 
 function suggestionFor(domain, keyword, target, mode, language) {
@@ -117,16 +126,56 @@ function softwareProjectCopy(keywords, language) {
   const versionControl = pick(/^(?:svn|git|github|gitlab|bitbucket)$/);
   const database = pick(/^(?:bd|base de datos|database|sql|mysql|postgresql|oracle|mongodb)$/);
   const artificialIntelligence = pick(/^(?:ia|ai|inteligencia artificial|artificial intelligence|machine learning)$/);
-  const categorized = new Set([frontend, backend, testing, versionControl, database, artificialIntelligence].filter(Boolean));
+  const assistedDevelopment = pick(/^(?:desarrollo asistido por ia|ai assisted development)$/);
+  const apiRest = pick(/^(?:api rest|rest api)$/);
+  const dashboard = pick(/(?:dashboard|kpi|business intelligence|datos gobernados|governed data)/);
+  const scalableFrontend = pick(/arquitectura frontend escalable|scalable frontend architecture/);
+  const testingPractice = pick(/^testing$/);
+  const codeReview = pick(/^code review$/);
+  const cloud = pick(/^(?:azure|aws|amazon web services|google cloud|gcp)$/);
+  const solid = pick(/^(?:solid|clean architecture|arquitectura limpia)$/);
+  const container = pick(/^(?:docker|kubernetes|k8s)$/);
+  const delivery = pick(/^(?:ci\/cd|continuous integration|continuous delivery)$/);
+  const categorized = new Set([frontend, backend, testing, versionControl, database, artificialIntelligence, assistedDevelopment, apiRest, dashboard, scalableFrontend, testingPractice, codeReview, cloud, solid, container, delivery].filter(Boolean));
   const other = keywords.filter((keyword) => !categorized.has(keyword));
 
   if (language === "es") {
+    if (dashboard) {
+      const stack = [frontend, pick(/^typescript$/)].filter(Boolean);
+      const quality = [
+        scalableFrontend ? "Construir componentes reutilizables dentro de una arquitectura frontend escalable" : "",
+        testingPractice ? "añadir pruebas unitarias y de flujo" : "",
+        codeReview ? "aplicar revisión de código mediante pull requests" : "",
+        assistedDevelopment ? "documentar y validar el uso de herramientas de IA durante el desarrollo" : "",
+      ].filter(Boolean);
+      const qualityLine = (quality.length ? quality.join("; ") : "Documentar la arquitectura, las decisiones técnicas y las instrucciones de ejecución").replace(/^./, (letter) => letter.toUpperCase()) + ".";
+      return ["Dashboard empresarial de operaciones y KPIs", [
+        "Desarrollar un dashboard empresarial" + (stack.length ? " con " + joinedKeywords(stack, "es") : "") + " para consultar indicadores operativos por periodo, estado y responsable.",
+        "Integrar " + (apiRest || "una API REST") + " segura con autenticación, permisos, manejo de errores y una capa tipada de acceso a datos.",
+        "Implementar KPIs, filtros combinables, drill-down y detalle de registros sobre un conjunto de datos gobernado.",
+        qualityLine,
+      ]];
+    }
+    if (cloud || solid || container || delivery) {
+      const sentences = ["Desarrollar un sistema de gestión de incidencias con usuarios, roles, prioridades y seguimiento de SLA, incorporando " + joinedKeywords(keywords, "es") + "."];
+      sentences.push(solid
+        ? "Estructurar la solución aplicando " + solid + " y separando dominio, aplicación, infraestructura e interfaces."
+        : "Separar las reglas de negocio, la persistencia y las integraciones mediante una arquitectura modular.");
+      sentences.push(cloud
+        ? "Desplegar la aplicación, la base de datos y el almacenamiento de archivos en " + cloud + "."
+        : container
+          ? "Empaquetar los servicios y la base de datos con " + container + " para ejecutar una demo reproducible."
+          : "Publicar una API documentada y preparar una instancia reproducible para demostración.");
+      sentences.push("Implementar pruebas automatizadas, monitoreo y un flujo de integración y despliegue continuo.");
+      return ["Sistema de gestión de incidencias con SLA", sentences];
+    }
     const implementation = [];
     if (frontend) implementation.push("una interfaz en " + frontend);
     if (backend) implementation.push("servicios en " + backend);
     if (database) implementation.push("persistencia en " + database);
     const sentences = ["Construir una aplicación funcional" + (implementation.length ? " con " + joinedKeywords(implementation, "es") : "") + "."];
     if (artificialIntelligence) sentences.push("Incorporar un componente de " + artificialIntelligence + " aplicado a una función concreta del producto.");
+    if (assistedDevelopment) sentences.push("Utilizar herramientas de desarrollo asistido por IA para apoyar la planificación, las pruebas y la documentación, revisando cada resultado antes de incorporarlo.");
     if (testing) sentences.push("Automatizar las pruebas del flujo principal con " + testing + ".");
     if (versionControl) sentences.push("Gestionar el código fuente y el historial de cambios con " + versionControl + ".");
     if (other.length) sentences.push("Integrar " + joinedKeywords(other, "es") + " dentro del flujo principal.");
@@ -136,7 +185,38 @@ function softwareProjectCopy(keywords, language) {
       : database && artificialIntelligence
         ? "Aplicación con " + joinedKeywords([database, artificialIntelligence], "es")
         : "Proyecto técnico con " + joinedKeywords(keywords, "es");
-    return [title, sentences.join(" ")];
+    return [title, sentences];
+  }
+
+  if (dashboard) {
+    const stack = [frontend, pick(/^typescript$/)].filter(Boolean);
+      const quality = [
+      scalableFrontend ? "Build reusable components within scalable frontend architecture" : "",
+      testingPractice ? "add unit and flow tests" : "",
+      codeReview ? "apply code review through pull requests" : "",
+        assistedDevelopment ? "document and validate the use of AI-assisted development tools" : "",
+      ].filter(Boolean);
+    const qualityLine = (quality.length ? quality.join("; ") : "Document the architecture, technical decisions and setup instructions").replace(/^./, (letter) => letter.toUpperCase()) + ".";
+    return ["Enterprise operations and KPI dashboard", [
+      "Build an enterprise dashboard" + (stack.length ? " with " + joinedKeywords(stack, "en") : "") + " to review operational indicators by period, status and owner.",
+      "Integrate " + (apiRest || "a REST API") + " securely with authentication, permissions, error handling and a typed data-access layer.",
+      "Implement KPIs, combinable filters, drill-down and record details over a governed dataset.",
+      qualityLine,
+    ]];
+  }
+
+  if (cloud || solid || container || delivery) {
+    const sentences = ["Build an incident-management system with users, roles, priorities and SLA tracking, incorporating " + joinedKeywords(keywords, "en") + "."];
+    sentences.push(solid
+      ? "Structure the solution with " + solid + ", separating domain, application, infrastructure and interfaces."
+      : "Separate business rules, persistence and integrations through a modular architecture.");
+    sentences.push(cloud
+      ? "Deploy the application, database and file storage on " + cloud + "."
+      : container
+        ? "Package the services and database with " + container + " for a reproducible demonstration environment."
+        : "Publish a documented API and prepare a reproducible demonstration environment.");
+    sentences.push("Add automated tests, monitoring and a continuous integration and deployment workflow.");
+    return ["SLA incident-management system", sentences];
   }
 
   const implementation = [];
@@ -145,6 +225,7 @@ function softwareProjectCopy(keywords, language) {
   if (database) implementation.push(database + " persistence");
   const sentences = ["Build a functional application" + (implementation.length ? " with " + joinedKeywords(implementation, "en") : "") + "."];
   if (artificialIntelligence) sentences.push("Add a " + artificialIntelligence + " component for one concrete product function.");
+  if (assistedDevelopment) sentences.push("Use AI-assisted development tools for planning, tests and documentation, reviewing every result before adoption.");
   if (testing) sentences.push("Automate the core flow tests with " + testing + ".");
   if (versionControl) sentences.push("Manage source code and change history with " + versionControl + ".");
   if (other.length) sentences.push("Integrate " + joinedKeywords(other, "en") + " into the core flow.");
@@ -154,52 +235,217 @@ function softwareProjectCopy(keywords, language) {
     : database && artificialIntelligence
       ? "Application using " + joinedKeywords([database, artificialIntelligence], "en")
       : "Technical project using " + joinedKeywords(keywords, "en");
-  return [title, sentences.join(" ")];
+  return [title, sentences];
+}
+
+function projectKeywordKey(keyword) {
+  const value = normalize(keyword).replace(/[^a-z0-9]+/g, " ").trim();
+  if (/\bux\b/.test(value) && /\bui\b/.test(value)) return "ux-ui";
+  if (/investigacion de usuarios|user research/.test(value)) return "user-research";
+  if (/^investigacion$|^research$/.test(value)) return "research";
+  return value;
+}
+
+function projectKeywordEntries(keywords) {
+  const entries = new Map();
+  for (const keyword of keywords) {
+    const key = projectKeywordKey(keyword);
+    if (!key) continue;
+    const current = entries.get(key);
+    if (current) current.coveredKeywords.push(keyword);
+    else entries.set(key, { key, label: keyword, coveredKeywords: [keyword] });
+  }
+  if (entries.has("user-research") && entries.has("research")) {
+    entries.get("user-research").coveredKeywords.push(...entries.get("research").coveredKeywords);
+    entries.delete("research");
+  }
+  if (entries.has("ux-ui")) {
+    for (const key of ["ux", "ui"]) {
+      if (!entries.has(key)) continue;
+      entries.get("ux-ui").coveredKeywords.push(...entries.get(key).coveredKeywords);
+      entries.delete(key);
+    }
+  } else if (entries.has("ux") && entries.has("ui")) {
+    const ux = entries.get("ux");
+    const ui = entries.get("ui");
+    entries.delete("ux");
+    entries.delete("ui");
+    entries.set("ux-ui", { key: "ux-ui", label: "UX/UI", coveredKeywords: [...ux.coveredKeywords, ...ui.coveredKeywords] });
+  }
+  return [...entries.values()];
+}
+
+function projectKeywordGroups(keywords, domain) {
+  const entries = projectKeywordEntries(keywords);
+  if (!entries.length) return [];
+  if (domain === "design") {
+    const uxPattern = /^(?:ux-ui|ux|ui|user-research|research)$|\b(?:figma|prototip\w*|usabilidad|accesibilidad|arquitectura de informacion|comunicacion|usuarios?)\b/i;
+    const ux = entries.filter((entry) => uxPattern.test(entry.key));
+    const visual = entries.filter((entry) => !uxPattern.test(entry.key));
+    return [ux, visual].filter((group) => group.length);
+  }
+  if (domain === "software" && entries.length <= 10) return [entries];
+  if (entries.length <= 7) return [entries];
+  const groupSize = Math.ceil(entries.length / Math.min(2, entries.length));
+  const groups = [];
+  for (let index = 0; index < entries.length; index += groupSize) groups.push(entries.slice(index, index + groupSize));
+  return groups;
+}
+
+function designProjectCopy(keywords, language) {
+  const terms = joinedKeywords(keywords, language);
+  const normalized = normalize(terms);
+  const uxProject = /\b(?:ux|ui|figma|prototip|usabilidad|accesibilidad|investigacion|comunicacion|usuarios?)\b/.test(normalized);
+  const motionProject = /\b(?:after effects|motion|video|animacion|blender|3d|max)\b/.test(normalized);
+
+  if (language !== "es") {
+    if (uxProject) return ["UX/UI redesign for a service platform", [
+      "Define the user problem and project scope, incorporating " + terms + ".",
+      "Research user needs through short interviews, a competitor review and a journey map.",
+      "Design the core responsive flow, an interactive prototype and a small component system.",
+      "Validate the prototype with a usability test and document findings and design decisions.",
+    ]];
+    return [motionProject ? "Visual campaign for a product launch" : "Visual identity for a local brand", [
+      "Define the audience, concept and visual direction, incorporating " + terms + ".",
+      "Create the main visual system and the digital and print assets required for the launch.",
+      "Prepare editable source files, final exports and a presentation explaining the design decisions.",
+    ]];
+  }
+
+  if (uxProject) return ["Rediseño UX/UI de una plataforma de servicios", [
+    "Definir el problema de usuario y el alcance del rediseño, incorporando " + terms + ".",
+    "Investigar las necesidades de usuarios mediante entrevistas breves, revisión de referentes y un mapa de recorrido.",
+    "Diseñar el flujo principal responsive, un prototipo navegable y un sistema básico de componentes.",
+    "Validar el prototipo con una prueba de usabilidad y documentar hallazgos y decisiones de diseño.",
+  ]];
+  return [motionProject ? "Campaña visual para el lanzamiento de un producto" : "Sistema de identidad para una marca local", [
+    "Definir el público, el concepto y la dirección visual, incorporando " + terms + ".",
+    "Diseñar el sistema gráfico principal y las piezas digitales e impresas necesarias para el lanzamiento.",
+    "Preparar archivos editables, artes finales y una presentación que explique las decisiones de diseño.",
+  ]];
+}
+
+function professionalProjectCopy(domain, keywords, language) {
+  if (domain === "software") return softwareProjectCopy(keywords, language);
+  if (domain === "design") return designProjectCopy(keywords, language);
+  const terms = joinedKeywords(keywords, language);
+  if (language !== "es") {
+    const english = {
+      legal: ["Legal file for a simulated small-business case", ["Define a realistic small-business scenario involving " + terms + ".", "Analyze the applicable rules, evidence and risks in a structured legal matrix.", "Draft a legal memorandum and the supporting document checklist with a reasoned conclusion."]],
+      architecture: ["Accessible compact-home concept", ["Define the site, users and design requirements, incorporating " + terms + ".", "Develop the floor plans, spatial model and key technical decisions.", "Prepare a concise design report, final drawings and a board suitable for portfolio review."]],
+      health: ["Educational protocol for a simulated case", ["Define a supervised simulated case involving " + terms + " without using patient data.", "Develop the protocol, decision criteria and educational materials.", "Document safety considerations, follow-up steps and learning outcomes for review."]],
+      marketing: ["Digital launch for a local service", ["Define the audience, offer and campaign objective, incorporating " + terms + ".", "Design the message, channel plan and required content pieces.", "Prepare the publishing calendar, budget assumptions and measurement dashboard."]],
+      finance: ["Budget and cash-flow model for a small business", ["Define a realistic business scenario involving " + terms + ".", "Build the assumptions, controls, budget and cash-flow model.", "Present key scenarios, findings and recommendations in an executive summary."]],
+      operations: ["Small-business inventory process redesign", ["Map the current process and identify a concrete problem involving " + terms + ".", "Design the future workflow, roles, controls and tracking indicators.", "Document the implementation plan and an evaluation checklist."]],
+      general: ["Practical solution for a local service", ["Define a concrete user problem and scope involving " + terms + ".", "Develop the proposed solution and the main deliverables.", "Prepare a short presentation with the method, validation criteria and next steps."]],
+    };
+    return english[domain] ?? english.general;
+  }
+  const spanish = {
+    legal: ["Expediente jurídico para un caso simulado de pyme", ["Delimitar un escenario empresarial verosímil que requiera " + terms + ".", "Analizar la normativa, la evidencia y los riesgos en una matriz jurídica estructurada.", "Redactar un informe legal y una lista de documentos de sustento con una conclusión razonada."]],
+    architecture: ["Anteproyecto de vivienda compacta accesible", ["Definir el terreno, los usuarios y los requisitos del encargo, incorporando " + terms + ".", "Desarrollar plantas, modelo espacial y decisiones técnicas principales.", "Preparar memoria descriptiva, planos finales y una lámina apta para portafolio."]],
+    health: ["Protocolo educativo para un caso simulado", ["Delimitar un caso simulado y supervisado que incorpore " + terms + " sin utilizar datos de pacientes.", "Elaborar el protocolo, los criterios de decisión y los materiales educativos.", "Documentar medidas de seguridad, seguimiento y aprendizajes para revisión profesional."]],
+    marketing: ["Lanzamiento digital de un servicio local", ["Definir la audiencia, la propuesta y el objetivo de campaña, incorporando " + terms + ".", "Diseñar el mensaje, el plan de canales y las piezas de contenido necesarias.", "Preparar el calendario, los supuestos de presupuesto y un tablero de medición."]],
+    finance: ["Modelo de presupuesto y flujo de caja para una pyme", ["Definir un escenario empresarial verosímil que incorpore " + terms + ".", "Construir supuestos, controles, presupuesto y flujo de caja.", "Presentar escenarios, hallazgos y recomendaciones en un resumen ejecutivo."]],
+    operations: ["Rediseño del proceso de inventario de una pyme", ["Mapear el proceso actual e identificar un problema concreto que requiera " + terms + ".", "Diseñar el flujo futuro, los responsables, los controles y los indicadores de seguimiento.", "Documentar el plan de implementación y una lista de verificación para evaluarlo."]],
+    general: ["Solución práctica para un servicio local", ["Definir un problema concreto y el alcance del proyecto, incorporando " + terms + ".", "Desarrollar la solución propuesta y sus entregables principales.", "Preparar una presentación breve con el método, los criterios de validación y los siguientes pasos."]],
+  };
+  return spanish[domain] ?? spanish.general;
+}
+
+function completeProjectPlan(domain, keywords, language) {
+  const terms = joinedKeywords(keywords, language);
+  const normalized = normalize(terms);
+  const cloudSoftware = domain === "software" && /\b(?:azure|aws|amazon web services|google cloud|gcp|solid|clean architecture|arquitectura limpia|docker|kubernetes|k8s|ci\/cd|continuous integration|continuous delivery)\b/.test(normalized);
+  const dashboardSoftware = domain === "software" && /\b(?:dashboard|kpi|business intelligence|datos gobernados|governed data)\b/.test(normalized);
+  const dashboardArchitecture = /arquitectura frontend escalable|scalable frontend architecture/.test(normalized);
+  const dashboardTesting = /\btesting\b/.test(normalized);
+  const dashboardReview = /\bcode review\b/.test(normalized);
+  const dashboardAssisted = /desarrollo asistido por ia|ai assisted development/.test(normalized);
+
+  if (language !== "es") {
+    if (dashboardSoftware) return {
+      summary: "Build a working operations dashboard for a simulated service company. Analysts and managers will be able to inspect governed business data, understand each KPI and move from a summary metric to the records that explain it.",
+      scope: ["Authenticate analyst and manager roles with different permissions.", "Consume a secure REST API through a typed service layer with loading, empty and error states.", "Display operational KPIs with date, status and owner filters plus drill-down to record details.", dashboardArchitecture ? "Create reusable chart, metric, filter and table components in a scalable frontend structure." : "Create reusable chart, metric, filter and table components.", dashboardTesting || dashboardReview || dashboardAssisted ? [dashboardTesting ? "Add unit and flow tests" : "", dashboardReview ? "use pull-request review" : "", dashboardAssisted ? "document how AI-assisted tools were verified" : ""].filter(Boolean).join(", ") + "." : "Document the technical decisions and validation criteria."],
+      deliverables: [dashboardTesting || dashboardReview ? "Public repository with branches, pull requests and passing tests." : "Public repository with meaningful commits.", "Online demo with analyst and manager test accounts.", dashboardAssisted ? "README with architecture, KPI definitions, setup and validation of AI-assisted work." : "README with architecture, KPI definitions and setup.", "Mock or documented API, data dictionary and portfolio screenshots."],
+    };
+    if (cloudSoftware) return {
+      summary: "Build a working professional MVP that a recruiter can open and test. The system will manage incidents from creation through resolution and will demonstrate " + terms + " through its architecture and deployment.",
+      scope: ["Authenticate users with customer, agent and administrator roles.", "Create, assign and track incidents with priorities, states, comments and attachments.", "Calculate SLA due dates and show filters, indicators and an audit trail.", "Separate domain, application and infrastructure concerns, then add tests, logs and automated deployment."],
+      deliverables: ["Public source-code repository with meaningful commits.", "Working online demo with seeded test accounts.", "README with setup, architecture and usage instructions.", "Architecture diagram, API collection and portfolio screenshots."],
+    };
+    const english = {
+      software: { summary: "Build a working MVP around " + terms + " with a complete user flow that can be demonstrated in an interview.", scope: ["Define users, permissions and the main end-to-end workflow.", "Implement the interface, business rules, persistence and error handling.", "Add automated tests, sample data and a reproducible deployment.", "Document technical decisions and the steps required to run the project."], deliverables: ["Public source-code repository.", "Working demo or executable build.", "README and architecture diagram.", "Test credentials, API collection and screenshots."] },
+      design: { summary: "Create a portfolio-ready case study that demonstrates " + terms + " through a realistic service redesign.", scope: ["Define the user problem, audience and project constraints.", "Research users and comparable products, then map the core journey.", "Produce flows, wireframes, a visual system and an interactive prototype.", "Run a usability test and document findings and iterations."], deliverables: ["Research summary and journey map.", "Editable design source and component library.", "Interactive prototype with the core flow.", "Short case study ready for a portfolio platform."] },
+      legal: { summary: "Prepare a complete simulated legal file applying " + terms + " to a realistic small-business scenario.", scope: ["Define the parties, facts and legal question.", "Research the applicable framework and identify risks.", "Prepare the analysis matrix and supporting-document checklist.", "Draft a reasoned legal memorandum with recommendations."], deliverables: ["Case brief and timeline.", "Legal research matrix.", "Supporting-document checklist.", "Final legal memorandum in PDF."] },
+      architecture: { summary: "Develop a portfolio-ready architectural proposal applying " + terms + " to a compact accessible home.", scope: ["Define the site, users, program and constraints.", "Resolve circulation, zoning and the spatial concept.", "Develop drawings, a model and key technical decisions.", "Present the proposal and verify it against the brief."], deliverables: ["Design brief and site analysis.", "Plans, sections and elevations.", "Editable model and selected views.", "Design report and final presentation board."] },
+      marketing: { summary: "Create a complete launch plan for a local service using " + terms + " in a realistic campaign scenario.", scope: ["Define the audience, positioning and measurable objective.", "Create the message, channel strategy and content system.", "Prepare the publishing plan, budget assumptions and assets.", "Build a measurement dashboard and optimization plan."], deliverables: ["Campaign brief and audience profile.", "Channel and content plan.", "Editable campaign assets.", "Measurement dashboard and presentation."] },
+      general: { summary: "Build a demonstrable independent project applying " + terms + " to a concrete professional problem.", scope: ["Define the problem, users and constraints.", "Develop the proposed solution and main deliverables.", "Validate the result against clear criteria.", "Document the process and lessons learned."], deliverables: ["Project brief.", "Editable working files.", "Final demonstrable output.", "Short portfolio presentation."] },
+    };
+    return english[domain] ?? english.general;
+  }
+
+  if (dashboardSoftware) return {
+    summary: "Construir un dashboard operativo para una empresa de servicios simulada. Analistas y responsables podrán consultar datos empresariales gobernados, entender cada KPI y pasar de un indicador general a los registros que explican el resultado.",
+    scope: ["Autenticar perfiles de analista y responsable con permisos distintos.", "Consumir una API REST segura mediante una capa tipada con estados de carga, vacío y error.", "Mostrar KPIs operativos con filtros por fecha, estado y responsable, además de drill-down al detalle.", dashboardArchitecture ? "Crear componentes reutilizables de gráficos, métricas, filtros y tablas dentro de una estructura frontend escalable." : "Crear componentes reutilizables de gráficos, métricas, filtros y tablas.", dashboardTesting || dashboardReview || dashboardAssisted ? [dashboardTesting ? "Añadir pruebas unitarias y de flujo" : "", dashboardReview ? "usar revisión mediante pull requests" : "", dashboardAssisted ? "documentar cómo se validó el apoyo de herramientas de IA" : ""].filter(Boolean).join(", ") + "." : "Documentar las decisiones técnicas y los criterios de validación."],
+    deliverables: [dashboardTesting || dashboardReview ? "Repositorio público con ramas, pull requests y pruebas aprobadas." : "Repositorio público con historial de cambios.", "Demo en línea con cuentas de analista y responsable.", dashboardAssisted ? "README con arquitectura, definición de KPIs, instalación y validación del trabajo asistido por IA." : "README con arquitectura, definición de KPIs e instalación.", "API simulada o documentada, diccionario de datos y capturas para portafolio."],
+  };
+  if (cloudSoftware) return {
+    summary: "Construir un MVP profesional que un reclutador pueda abrir y probar. El sistema gestionará incidencias desde su registro hasta su resolución y demostrará " + terms + " mediante la arquitectura y el despliegue.",
+    scope: ["Autenticar usuarios con roles de cliente, agente y administrador.", "Registrar, asignar y seguir incidencias con prioridades, estados, comentarios y archivos adjuntos.", "Calcular vencimientos de SLA y mostrar filtros, indicadores e historial de cambios.", "Separar dominio, aplicación e infraestructura; añadir pruebas, registros y despliegue automatizado."],
+    deliverables: ["Repositorio público con código funcional e historial de cambios.", "Demo en línea con usuarios de prueba y datos precargados.", "README con instalación, arquitectura y guía de uso.", "Diagrama técnico, colección de API y capturas para portafolio."],
+  };
+  const spanish = {
+    software: { summary: "Construir un MVP funcional alrededor de " + terms + " con un flujo completo que pueda demostrarse en una entrevista.", scope: ["Definir usuarios, permisos y el recorrido principal de principio a fin.", "Implementar interfaz, reglas de negocio, persistencia y manejo de errores.", "Añadir pruebas automatizadas, datos de ejemplo y un despliegue reproducible.", "Documentar decisiones técnicas y los pasos para ejecutar el proyecto."], deliverables: ["Repositorio público con código fuente.", "Demo funcional o versión ejecutable.", "README y diagrama de arquitectura.", "Credenciales de prueba, colección de API y capturas."] },
+    design: { summary: "Crear un caso de estudio listo para portafolio que demuestre " + terms + " mediante el rediseño realista de un servicio.", scope: ["Definir el problema, el público y las restricciones del encargo.", "Investigar usuarios y referentes; representar el recorrido principal.", "Producir flujos, wireframes, sistema visual y prototipo navegable.", "Realizar una prueba de usabilidad y documentar hallazgos e iteraciones."], deliverables: ["Resumen de investigación y mapa de recorrido.", "Archivo editable y biblioteca de componentes.", "Prototipo interactivo del flujo principal.", "Caso breve listo para Behance o portafolio." ] },
+    legal: { summary: "Preparar un expediente jurídico simulado y completo que aplique " + terms + " a un escenario verosímil de una pyme.", scope: ["Definir las partes, los hechos y la cuestión jurídica.", "Investigar el marco aplicable e identificar riesgos.", "Preparar la matriz de análisis y la lista de documentos de sustento.", "Redactar un informe jurídico razonado con recomendaciones."], deliverables: ["Ficha del caso y cronología.", "Matriz de investigación jurídica.", "Lista de documentación de sustento.", "Informe jurídico final en PDF."] },
+    architecture: { summary: "Desarrollar una propuesta arquitectónica lista para portafolio que aplique " + terms + " a una vivienda compacta accesible.", scope: ["Definir terreno, usuarios, programa y restricciones.", "Resolver circulación, zonificación y concepto espacial.", "Desarrollar planos, modelo y decisiones técnicas principales.", "Presentar la propuesta y verificarla frente al encargo."], deliverables: ["Brief y análisis del lugar.", "Plantas, cortes y elevaciones.", "Modelo editable y vistas seleccionadas.", "Memoria y lámina final de presentación."] },
+    health: { summary: "Desarrollar un caso educativo simulado que aplique " + terms + " sin utilizar información real de pacientes.", scope: ["Definir el escenario, los objetivos y los límites de seguridad.", "Preparar protocolo, criterios de decisión y materiales educativos.", "Simular el seguimiento y registrar decisiones.", "Revisar el resultado con criterios profesionales verificables."], deliverables: ["Ficha del caso simulado.", "Protocolo y material educativo.", "Registro de decisiones y seguimiento.", "Informe de aprendizajes y revisión."] },
+    marketing: { summary: "Crear un lanzamiento completo para un servicio local aplicando " + terms + " en un escenario de campaña verosímil.", scope: ["Definir audiencia, posicionamiento y objetivo medible.", "Crear mensaje, estrategia de canales y sistema de contenidos.", "Preparar calendario, supuestos de presupuesto y piezas.", "Construir un tablero de medición y un plan de optimización."], deliverables: ["Brief de campaña y perfil de audiencia.", "Plan de canales y contenidos.", "Piezas editables de campaña.", "Tablero de medición y presentación final."] },
+    finance: { summary: "Construir un caso financiero demostrable que aplique " + terms + " a una pyme simulada.", scope: ["Definir el escenario, los supuestos y las fuentes de datos.", "Preparar presupuesto, flujo de caja y controles.", "Analizar escenarios y riesgos principales.", "Presentar hallazgos y recomendaciones ejecutivas."], deliverables: ["Libro de trabajo editable.", "Modelo de presupuesto y flujo de caja.", "Panel de escenarios e indicadores.", "Resumen ejecutivo en PDF."] },
+    operations: { summary: "Diseñar una mejora operativa demostrable que aplique " + terms + " al inventario de una pyme simulada.", scope: ["Mapear el proceso actual e identificar el problema.", "Diseñar el flujo futuro, roles y controles.", "Definir indicadores y un plan de implementación.", "Validar la propuesta con casos de prueba."], deliverables: ["Mapa del proceso actual y futuro.", "Matriz de responsables y controles.", "Tablero de indicadores.", "Plan de implementación y presentación."] },
+    general: { summary: "Desarrollar un proyecto independiente demostrable que aplique " + terms + " a un problema profesional concreto.", scope: ["Definir el problema, los usuarios y las restricciones.", "Construir la solución y sus entregables principales.", "Validar el resultado con criterios claros.", "Documentar el proceso y los aprendizajes."], deliverables: ["Brief del proyecto.", "Archivos de trabajo editables.", "Resultado final demostrable.", "Presentación breve para portafolio."] },
+  };
+  return spanish[domain] ?? spanish.general;
 }
 
 export function automaticProjectSuggestions(result, targetLabel, sourceText, language = "es") {
-  const missing = result.keywordMatch?.missing ?? [];
+  const missing = result.keywordMatch?.projectMissing ?? result.keywordMatch?.missing ?? [];
   if (!missing.length) return [];
   const domain = inferProfessionalDomain(sourceText, targetLabel);
-  const groupSize = Math.ceil(missing.length / Math.min(2, missing.length));
-  const groups = [];
-  for (let index = 0; index < missing.length; index += groupSize) groups.push(missing.slice(index, index + groupSize));
+  const groups = projectKeywordGroups(missing, domain);
+  const source = normalize(sourceText);
+  const matchedFoundation = (result.keywordMatch?.matched ?? []).filter((keyword) => /^(?:responsive design|arquitectura frontend escalable|scalable frontend architecture|git)$/i.test(keyword));
+  const softwareFoundation = domain === "software"
+    ? [
+      /\breact(?:js|\.js)?\b/.test(source) ? "React" : /\bangular(?:js)?\b/.test(source) ? "Angular" : "",
+      /\btypescript\b/.test(source) ? "TypeScript" : "",
+      ...matchedFoundation,
+    ].filter(Boolean)
+    : [];
 
-  return groups.map((keywords, index) => {
+  return groups.map((entries, index) => {
+    const keywords = entries.map((entry) => entry.label);
+    const projectContext = [...new Set([...keywords, ...softwareFoundation])];
+    const coveredKeywords = entries.flatMap((entry) => entry.coveredKeywords);
     const terms = joinedKeywords(keywords, language);
-    const spanish = {
-      legal: ["Caso jurídico sobre " + terms, "Elaborar un expediente práctico que aplique " + terms + ", identificando el marco normativo, los riesgos, el criterio jurídico y una conclusión documentada."],
-      architecture: ["Propuesta arquitectónica con " + terms, "Desarrollar una propuesta aplicando " + terms + ", con planos, memoria descriptiva, decisiones técnicas y entregables verificables."],
-      design: ["Caso de estudio con " + terms, "Diseñar y documentar un caso de estudio que aplique " + terms + ", desde la investigación y definición del problema hasta los entregables y aprendizajes."],
-      health: ["Caso práctico sobre " + terms, "Desarrollar un caso simulado y supervisado que aplique " + terms + ", documentando el protocolo, las decisiones, el seguimiento y los aprendizajes sin incluir datos de pacientes."],
-      marketing: ["Campaña integral con " + terms, "Diseñar una campaña que integre " + terms + ", definiendo audiencia, mensaje, canales, piezas, presupuesto y métricas de evaluación."],
-      finance: ["Caso financiero con " + terms, "Resolver un caso práctico utilizando " + terms + ", con supuestos, procedimiento, controles, análisis de resultados y conclusiones."],
-      operations: ["Mejora operativa con " + terms, "Diseñar una mejora de proceso aplicando " + terms + ", con diagnóstico, flujo propuesto, responsables, entregables e indicadores de seguimiento."],
-      software: ["Proyecto técnico con " + terms, "Construir una aplicación funcional que integre " + terms + ". Documentar la arquitectura, el flujo principal, la configuración, las pruebas y las instrucciones de ejecución."],
-      general: ["Proyecto aplicado con " + terms, "Desarrollar un proyecto práctico que aplique " + terms + ", con un objetivo definido, metodología, entregables y criterios claros de evaluación."],
-    };
-    const english = {
-      legal: ["Legal case using " + terms, "Prepare a practical case using " + terms + ", documenting the legal framework, risks, reasoning and conclusion."],
-      architecture: ["Architecture proposal using " + terms, "Develop a proposal using " + terms + ", with drawings, a design brief, technical decisions and verifiable deliverables."],
-      design: ["Case study using " + terms, "Design and document a case study using " + terms + ", from research and problem definition through deliverables and lessons learned."],
-      health: ["Practical case using " + terms, "Develop a supervised simulated case using " + terms + ", documenting the protocol, decisions, follow-up and lessons without patient data."],
-      marketing: ["Integrated campaign using " + terms, "Design a campaign using " + terms + ", defining its audience, message, channels, assets, budget and evaluation metrics."],
-      finance: ["Finance case using " + terms, "Solve a practical case using " + terms + ", with assumptions, procedures, controls, result analysis and conclusions."],
-      operations: ["Operations improvement using " + terms, "Design a process improvement using " + terms + ", with a diagnosis, proposed workflow, owners, deliverables and tracking indicators."],
-      software: ["Technical project using " + terms, "Build a functional application integrating " + terms + ". Document its architecture, core flow, configuration, tests and setup instructions."],
-      general: ["Applied project using " + terms, "Develop a practical project using " + terms + ", with a defined objective, method, deliverables and clear evaluation criteria."],
-    };
-    const [title, text] = domain === "software"
-      ? softwareProjectCopy(keywords, language)
-      : (language === "es" ? spanish : english)[domain] ?? (language === "es" ? spanish.general : english.general);
+    const [title, bullets] = professionalProjectCopy(domain, projectContext, language);
+    const plan = completeProjectPlan(domain, projectContext, language);
+    const text = bullets.join(" ");
     return {
       id: "automatic-project-" + index,
       keyword: terms,
       keywords,
+      coveredKeywords,
       domain,
       mode: "project",
       title,
       text,
+      bullets,
+      projectType: language === "es" ? "Proyecto independiente" : "Independent project",
+      summary: plan.summary,
+      scope: plan.scope,
+      deliverables: plan.deliverables,
       included: true,
     };
   });
@@ -212,8 +458,11 @@ export function appendConfirmedEvidence(sourceText, proposals, language = "es") 
 
   if (projects.length) {
     blocks.push([
-      language === "es" ? "PROYECTOS RELEVANTES" : "RELEVANT PROJECTS",
-      ...projects.flatMap((item) => [(language === "es" ? "Proyecto: " : "Project: ") + (item.title.trim() || item.keyword), "• " + item.text.trim()]),
+      language === "es" ? "PROYECTOS INDEPENDIENTES" : "INDEPENDENT PROJECTS",
+      ...projects.flatMap((item) => [
+        (language === "es" ? "Proyecto: " : "Project: ") + (item.title.trim() || item.keyword) + " — " + (item.projectType || (language === "es" ? "Proyecto independiente" : "Independent project")),
+        ...(item.bullets?.length ? item.bullets : [item.text]).map((line) => "• " + line.trim()),
+      ]),
     ].join("\n"));
   }
   if (learning.length) {
@@ -382,7 +631,7 @@ const SECTION_HEADINGS = {
     profile: "PERFIL PROFESIONAL",
     specializations: "ÁREAS DE ESPECIALIZACIÓN",
     experience: "EXPERIENCIA PROFESIONAL",
-    projects: "PROYECTOS RELEVANTES",
+    projects: "PROYECTOS INDEPENDIENTES",
     skills: "HABILIDADES",
     training: "FORMACIÓN Y HABILIDADES EN DESARROLLO",
     certifications: "CURSOS Y CERTIFICACIONES",
@@ -395,7 +644,7 @@ const SECTION_HEADINGS = {
     profile: "PROFESSIONAL SUMMARY",
     specializations: "AREAS OF EXPERTISE",
     experience: "PROFESSIONAL EXPERIENCE",
-    projects: "RELEVANT PROJECTS",
+    projects: "INDEPENDENT PROJECTS",
     skills: "SKILLS",
     training: "TRAINING AND DEVELOPING SKILLS",
     certifications: "COURSES AND CERTIFICATIONS",

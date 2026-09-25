@@ -62,6 +62,7 @@ export default function ResumeImprovementPlan({ result, originalResumeText, file
   [completeResumeText, result, targetLabel, language, fileName]);
   const [printing, setPrinting] = useState(false);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle");
+  const eligibility = result.eligibilityChecks ?? [];
 
   useEffect(() => {
     if (!printing) return;
@@ -89,24 +90,52 @@ export default function ResumeImprovementPlan({ result, originalResumeText, file
   }
 
   return <section className="resume-improvement-plan automatic-resume-plan" aria-labelledby="improvement-plan-title">
-    <h2 id="improvement-plan-title">{es ? "Proyectos para cubrir las brechas" : "Projects to close the gaps"}</h2>
+    <h2 id="improvement-plan-title">{es ? "Proyecto independiente para esta oferta" : "Independent project for this role"}</h2>
     <p className="automatic-resume-intro">{projects.length
       ? (es
-        ? `Tu CV actual tiene ${result.score ?? "—"}% de coincidencia. Ese es el puntaje real del archivo que subiste. Estos proyectos se incorporarán en la versión descargable sin alterar artificialmente ese porcentaje.`
-        : `Your current resume has a ${result.score ?? "—"}% match. That is the actual score of the file you uploaded. These projects will be included in the downloadable version without artificially changing that percentage.`)
-      : (es ? "Tu CV no presenta brechas de palabras clave detectables para esta oferta." : "Your resume has no detectable keyword gaps for this job.")}</p>
+        ? `Tu CV actual tiene ${result.score ?? "—"}% de coincidencia. Te proponemos un proyecto demostrable según los requisitos faltantes. En el CV solo aparecerá la versión breve; aquí tienes el alcance completo para desarrollarlo y enseñarlo.`
+        : `Your current resume has a ${result.score ?? "—"}% match. We propose a demonstrable project based on the missing requirements. Only the concise version will appear in the resume; the full scope stays here so you can build and present it.`)
+      : (es ? "No detectamos una brecha técnica que deba convertirse en proyecto. Revisa igualmente los requisitos personales de la oferta." : "We did not detect a technical gap that should become a project. Review the job's personal requirements as well.")}</p>
+
+    {eligibility.length > 0 && <section className="offer-eligibility" aria-labelledby="offer-eligibility-title">
+      <h3 id="offer-eligibility-title">{es ? "Requisitos que un proyecto no reemplaza" : "Requirements a project cannot replace"}</h3>
+      <p>{es ? "Los separamos de las habilidades técnicas para no convertir idiomas, estudios, residencia o años de experiencia en proyectos ficticios." : "We keep these separate from technical skills so languages, education, residence or years of experience do not become fictional projects."}</p>
+      <ul>{eligibility.map((item) => <li key={item.id}>
+        <div><strong>{item.label}</strong><span>{item.evidence}</span></div>
+        <span className={`offer-eligibility-status ${item.status}`}>
+          {item.status === "matched" ? (es ? "Detectado" : "Found") : item.status === "missing" ? (es ? "No acreditado" : "Not shown") : (es ? "Confirmar" : "Confirm")}
+        </span>
+      </li>)}</ul>
+    </section>}
 
     {projects.length > 0 && <section className="automatic-projects" aria-labelledby="automatic-projects-title">
-      <h3 id="automatic-projects-title">{es ? "Esto se añadirá al CV descargable" : "This will be added to the downloadable resume"}</h3>
+      <h3 id="automatic-projects-title">{es ? "Proyecto completo recomendado" : "Recommended complete project"}</h3>
       <div>
         {projects.map((project, index) => <article className="automatic-project-card" key={project.id}>
-          <span className="automatic-project-number">{es ? `Proyecto sugerido ${index + 1}` : `Suggested project ${index + 1}`}</span>
+          <span className="automatic-project-number">{es ? `${project.projectType} ${index + 1}` : `${project.projectType} ${index + 1}`}</span>
           <h4>{project.title}</h4>
-          <p>{project.text}</p>
+          <p className="automatic-project-summary">{project.summary}</p>
+          <div className="automatic-project-plan">
+            <section>
+              <h5>{es ? "Qué debe incluir" : "What it should include"}</h5>
+              <ul>{project.scope.map((item) => <li key={item}>{item}</li>)}</ul>
+            </section>
+            <section>
+              <h5>{es ? "Qué debes poder enseñar" : "What you should be able to show"}</h5>
+              <ul>{project.deliverables.map((item) => <li key={item}>{item}</li>)}</ul>
+            </section>
+          </div>
           <strong className="automatic-project-keyword-label">{es ? "Requisitos que aborda" : "Requirements addressed"}</strong>
-          <ul aria-label={es ? "Requisitos que aborda" : "Requirements addressed"}>
+          <ul className="automatic-project-keywords" aria-label={es ? "Requisitos que aborda" : "Requirements addressed"}>
             {project.keywords.map((keyword) => <li key={keyword}>{keyword}</li>)}
           </ul>
+          <section className="automatic-project-cv-preview" aria-label={es ? "Versión breve para el CV" : "Concise resume version"}>
+            <span>{es ? "Versión breve que irá al CV" : "Concise version for the resume"}</span>
+            <h5>{project.title} — {project.projectType}</h5>
+            <ul className="automatic-project-steps">
+              {(project.bullets ?? [project.text]).map((step) => <li key={step}>{step}</li>)}
+            </ul>
+          </section>
         </article>)}
       </div>
     </section>}
@@ -115,7 +144,7 @@ export default function ResumeImprovementPlan({ result, originalResumeText, file
       <button className="primary" type="button" onClick={() => setPrinting(true)} disabled={printing}>{es ? "Descargar CV completo en PDF" : "Download complete resume as PDF"} <span aria-hidden="true">↓</span></button>
       <button type="button" onClick={() => void copyResume()}>{copyStatus === "copied" ? (es ? "Copiado ✓" : "Copied ✓") : (es ? "Copiar CV completo" : "Copy complete resume")}</button>
     </div>
-    <p className="resume-export-note">{es ? "La descarga conserva tu experiencia original y añade estos proyectos en una sección separada y presentable." : "The download keeps your original experience and adds these projects in a separate, polished section."}</p>
+    <p className="resume-export-note">{es ? "La descarga conserva tu experiencia original y añade únicamente la versión breve del proyecto independiente." : "The download keeps your original experience and adds only the concise independent-project version."}</p>
     {copyStatus === "error" && <p className="resume-copy-status" role="status">{es ? "No se pudo copiar. Puedes descargar el PDF." : "Could not copy. You can download the PDF."}</p>}
     {printing && createPortal(<ReferenceResumeDocument resume={adaptedResume} language={language} />, document.body)}
   </section>;

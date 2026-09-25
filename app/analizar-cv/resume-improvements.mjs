@@ -17,7 +17,7 @@ const sectionNames = [
   ["experience", /^(experiencia(?: profesional| laboral)?|trayectoria profesional|professional experience|work experience|employment|work history)(?:\s*[-–—]\s*(?:continuacion|continuación|continued))?$/i],
   ["education", /^(educacion|formacion(?: academica)?|estudios|education|academic background)$/i],
   ["skills", /^(habilidades(?: tecnicas)?|competencias(?: tecnicas)?|tecnologias|software(?: skills?)?|technical skills|skills|competencies|tools)$/i],
-  ["projects", /^(proyectos(?: personales| destacados| adicionales| relevantes)?|proyectos y evidencia relevante|algunos trabajos mios|projects|additional projects|relevant projects|relevant projects and evidence)$/i],
+  ["projects", /^(proyectos(?: personales| independientes| destacados| adicionales| relevantes)?|proyectos y evidencia relevante|algunos trabajos mios|projects|independent projects|additional projects|relevant projects|relevant projects and evidence)$/i],
   ["training", /^(formacion y habilidades en desarrollo|habilidades en desarrollo|training and developing skills)$/i],
   ["certifications", /^(certificaciones|cursos(?: y certificaciones)?(?: en linea| en línea)?|formacion complementaria|certifications|courses|additional training)$/i],
   ["languages", /^(idiomas?|lenguajes?|languages?)$/i],

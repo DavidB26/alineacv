@@ -23,6 +23,7 @@ const REQUIREMENT_GROUPS = [
   ["Sass", ["sass", "scss"]],
   ["Tailwind CSS", ["tailwind", "tailwindcss", "tailwind css"]],
   ["Bootstrap", ["bootstrap"]],
+  ["Responsive Design", ["responsive design", "diseno responsive", "interfaces responsive", "responsive"]],
   ["Python", ["python"]],
   ["Java", ["java"]],
   ["C#", ["c#", "c sharp"]],
@@ -49,10 +50,13 @@ const REQUIREMENT_GROUPS = [
   ["Kubernetes", ["kubernetes", "k8s"]],
   ["Git", ["git"]],
   ["GitHub", ["github"]],
-  ["CI/CD", ["ci/cd", "continuous integration", "continuous delivery"]],
+  ["CI/CD", ["ci/cd", "ci", "cd", "continuous integration", "continuous delivery"]],
   ["API", ["api", "apis"]],
   ["REST", ["rest", "restful"]],
   ["GraphQL", ["graphql"]],
+  ["Testing", ["testing", "pruebas automatizadas", "pruebas unitarias", "unit testing", "unit tests", "automated testing"]],
+  ["Code review", ["code review", "revision de codigo", "revisiones de codigo"]],
+  ["Arquitectura frontend escalable", ["arquitectura frontend escalable", "arquitecturas frontend escalables", "componentes reutilizables", "componentes responsive y reutilizables", "reutilizables", "reusable components", "scalable frontend architecture"]],
   ["WordPress", ["wordpress"]],
   ["Drupal", ["drupal"]],
   ["Figma", ["figma"]],
@@ -69,11 +73,14 @@ const REQUIREMENT_GROUPS = [
   ["Publicidad", ["publicidad", "advertising"]],
   ["Edición de video", ["edicion de video", "video editing"]],
   ["Diseño web", ["diseno web", "web design"]],
-  ["UI/UX", ["ui/ux", "ux/ui", "user experience", "user interface"]],
+  ["UI/UX", ["ui/ux", "ux/ui", "ui", "ux", "user experience", "user interface"]],
   ["QA", ["quality assurance", "qa"]],
   ["Selenium", ["selenium"]],
   ["Cypress", ["cypress"]],
   ["Power BI", ["power bi", "powerbi"]],
+  ["Business Intelligence", ["business intelligence", "conceptos bi", "bi"]],
+  ["Dashboards y KPIs", ["dashboards", "dashboard", "kpis", "kpi", "drill-down", "drill down"]],
+  ["Datos gobernados", ["datos gobernados", "governed data"]],
   ["Tableau", ["tableau"]],
   ["Excel", ["excel", "microsoft excel"]],
   ["SAP", ["sap"]],
@@ -81,7 +88,7 @@ const REQUIREMENT_GROUPS = [
   ["ERP", ["erp"]],
   ["Análisis de datos", ["analisis de datos", "data analysis", "data analytics"]],
   ["Machine Learning", ["machine learning", "aprendizaje automatico"]],
-  ["Inteligencia artificial", ["inteligencia artificial", "artificial intelligence"]],
+  ["Inteligencia artificial", ["inteligencia artificial", "artificial intelligence", "ia"]],
   ["Estadística", ["estadistica", "statistics"]],
   ["Marketing", ["marketing"]],
   ["Marketing de contenidos", ["marketing de contenidos", "content marketing"]],
@@ -165,6 +172,28 @@ const REQUIREMENT_GROUPS = [
   ["Inglés", ["ingles", "english"]],
   ["Portugués", ["portugues", "portuguese"]],
 ];
+
+const SPECIAL_REQUIREMENTS = new Map([
+  ["React o Angular", {
+    label: "React o Angular",
+    aliases: ["react", "reactjs", "react.js", "angular", "angularjs"],
+  }],
+  ["API REST", {
+    label: "API REST",
+    aliases: ["api rest", "apis rest", "rest api", "restful api", "restful services", "servicios rest"],
+  }],
+  ["Inglés C1", {
+    label: "Inglés C1",
+    aliases: ["ingles c1", "ingles: c1", "c1 avanzado", "ingles avanzado", "ingles: avanzado", "english c1", "advanced english"],
+    projectable: false,
+  }],
+  ["Desarrollo asistido por IA", {
+    label: "Desarrollo asistido por IA",
+    aliases: ["desarrollo asistido por ia", "herramientas de desarrollo asistidas por ia", "github copilot", "chatgpt", "claude", "ai-assisted development", "ai assisted development"],
+  }],
+]);
+
+const NON_PROJECT_REQUIREMENTS = new Set(["Inglés", "Portugués", "Inglés C1"]);
 
 const SECTION_PATTERNS = {
   profile: /\b(perfil|resumen|objetivo|summary|profile|objective|about)\b/i,
@@ -301,16 +330,128 @@ export function resumeSearchSkills(value) {
 
 function keywordList(value) {
   const normalizedValue = normalize(value);
-  const requirements = REQUIREMENT_GROUPS
+  let requirements = REQUIREMENT_GROUPS
     .filter(([, aliases]) => aliases.some((alias) => hasTerm(normalizedValue, alias)))
-    .map(([label, aliases]) => ({ label, aliases }));
+    .map(([label, aliases]) => ({ label, aliases, projectable: !NON_PROJECT_REQUIREMENTS.has(label) }));
 
-  const knownAliases = new Set(REQUIREMENT_GROUPS.flatMap(([, aliases]) => aliases.map((alias) => normalize(alias))));
+  const replaceWithSpecial = (label, replacedLabels) => {
+    const special = SPECIAL_REQUIREMENTS.get(label);
+    requirements = requirements.filter((requirement) => !replacedLabels.includes(requirement.label));
+    if (special && !requirements.some((requirement) => requirement.label === special.label)) requirements.push(special);
+  };
+
+  if (/\b(?:react\s+(?:o|or)\s+angular|angular\s+(?:o|or)\s+react)\b/.test(normalizedValue)) {
+    replaceWithSpecial("React o Angular", ["React", "Angular"]);
+  }
+  if (/\b(?:apis?\s+rest(?:ful)?|rest(?:ful)?\s+apis?|servicios?\s+rest)\b/.test(normalizedValue)) {
+    replaceWithSpecial("API REST", ["API", "REST"]);
+  }
+  if (/\b(?:ingles|english)\b[^.\n]{0,24}\bc1\b|\bc1\b[^.\n]{0,24}\b(?:ingles|english)\b/.test(normalizedValue)) {
+    replaceWithSpecial("Inglés C1", ["Inglés"]);
+  }
+  if (/\b(?:desarrollo asistid[oa] por ia|herramientas? de desarrollo asistid[oa]s? por ia|github copilot|chatgpt|claude|ai[- ]assisted development)\b/.test(normalizedValue)) {
+    replaceWithSpecial("Desarrollo asistido por IA", ["Inteligencia artificial"]);
+  }
+  const withoutCopilot = normalizedValue.replace(/\bgithub copilot\b/g, "");
+  if (!hasTerm(withoutCopilot, "github")) requirements = requirements.filter((requirement) => requirement.label !== "GitHub");
+
+  const labels = new Set(requirements.map((requirement) => requirement.label));
+  requirements = requirements.filter((requirement) => {
+    if (requirement.label === "Investigación" && (labels.has("Investigación de usuarios") || labels.has("Investigación jurídica"))) return false;
+    if (requirement.label === "Marketing" && (labels.has("Marketing de contenidos") || labels.has("Email marketing"))) return false;
+    return true;
+  });
+
+  const knownAliases = new Set([
+    ...REQUIREMENT_GROUPS.flatMap(([, aliases]) => aliases.map((alias) => normalize(alias))),
+    ...[...SPECIAL_REQUIREMENTS.values()].flatMap((requirement) => requirement.aliases.map((alias) => normalize(alias))),
+    "c1",
+    "ia",
+  ]);
   const acronyms = Array.from(new Set(value.match(/\b[A-Z][A-Z0-9]{1,9}\b/g) ?? []))
     .filter((token) => !STOP_WORDS.has(normalize(token)) && !knownAliases.has(normalize(token)))
     .map((token) => ({ label: token, aliases: [token] }));
 
   return [...requirements, ...acronyms].slice(0, 18);
+}
+
+const LANGUAGE_LEVEL = new Map([
+  ["a1", 1], ["a2", 2], ["basico", 2], ["basic", 2],
+  ["b1", 3], ["intermedio", 3], ["intermediate", 3], ["b2", 4],
+  ["c1", 5], ["avanzado", 5], ["advanced", 5], ["c2", 6], ["nativo", 6], ["native", 6],
+]);
+
+function nearbyLanguageLevel(text, languagePattern) {
+  const match = text.match(new RegExp(`(?:${languagePattern})[^.\\n|]{0,32}?\\b(a1|a2|b1|b2|c1|c2|basico|basic|intermedio|intermediate|avanzado|advanced|nativo|native)\\b|\\b(a1|a2|b1|b2|c1|c2|basico|basic|intermedio|intermediate|avanzado|advanced|nativo|native)\\b[^.\\n|]{0,20}?(?:${languagePattern})`));
+  const level = match?.[1] ?? match?.[2];
+  return level ? { label: level.toUpperCase(), rank: LANGUAGE_LEVEL.get(level) ?? 0 } : null;
+}
+
+function eligibilityChecks(jobDescription, resumeText, language) {
+  const job = normalize(jobDescription);
+  const resume = normalize(resumeText);
+  const checks = [];
+  const languageDefinitions = [
+    { id: "english", pattern: "ingles|english", es: "Inglés", en: "English" },
+    { id: "portuguese", pattern: "portugues|portuguese", es: "Portugués", en: "Portuguese" },
+    { id: "french", pattern: "frances|french", es: "Francés", en: "French" },
+  ];
+
+  for (const definition of languageDefinitions) {
+    const required = nearbyLanguageLevel(job, definition.pattern);
+    if (!required) continue;
+    const current = nearbyLanguageLevel(resume, definition.pattern);
+    const label = `${language === "es" ? definition.es : definition.en} ${required.label}`;
+    checks.push({
+      id: `eligibility-${definition.id}`,
+      label,
+      status: current && current.rank >= required.rank ? "matched" : "missing",
+      evidence: current
+        ? localized(language, `El CV declara nivel ${current.label}.`, `The resume states a ${current.label} level.`)
+        : localized(language, "El CV no declara ese nivel.", "The resume does not state that level."),
+    });
+  }
+
+  const yearsMatch = job.match(/(?:\+|mas de|al menos|minimum of|at least)?\s*(\d{1,2})\s+(?:anos?|years?)(?:\s+de)?\s+experiencia/);
+  if (yearsMatch) {
+    const requiredYears = Number(yearsMatch[1]);
+    const declaredYears = [...resume.matchAll(/(?:mas de\s+)?(\d{1,2})\s+(?:anos?|years?)(?:\s+de)?\s+experiencia/g)]
+      .map((match) => Number(match[1]))
+      .sort((a, b) => b - a)[0];
+    checks.push({
+      id: "eligibility-experience",
+      label: localized(language, `${requiredYears}+ años de experiencia`, `${requiredYears}+ years of experience`),
+      status: Number.isFinite(declaredYears) ? (declaredYears >= requiredYears ? "matched" : "missing") : "review",
+      evidence: Number.isFinite(declaredYears)
+        ? localized(language, `El CV declara ${declaredYears} años de experiencia.`, `The resume states ${declaredYears} years of experience.`)
+        : localized(language, "Revisa las fechas laborales; el CV no declara un total explícito.", "Review employment dates; the resume does not state an explicit total."),
+    });
+  }
+
+  if (/\b(?:estudios?|formacion|degree|education)\b[^.\n]{0,90}\b(?:tecnic|universitari|bachiller|licenciatura|engineering|bachelor)\w*/.test(job)) {
+    const found = /\b(?:bachiller|licenciad|titulad|egresad|universidad|universitari|instituto|tecnic|bachelor|degree|graduate)\w*/.test(resume);
+    checks.push({
+      id: "eligibility-education",
+      label: localized(language, "Formación técnica o universitaria", "Technical or university education"),
+      status: found ? "matched" : "review",
+      evidence: found
+        ? localized(language, "El CV contiene formación académica compatible para revisión.", "The resume contains compatible education for review.")
+        : localized(language, "No se reconoció una formación equivalente con suficiente certeza.", "No equivalent education was recognized with enough confidence."),
+    });
+  }
+
+  if (/\b(?:residencia|residir|resident|residence)\b[^.\n]{0,70}\bperu\b/.test(job)) {
+    const found = /\bperu\b/.test(resume);
+    checks.push({
+      id: "eligibility-location",
+      label: localized(language, "Residencia en Perú", "Residence in Peru"),
+      status: found ? "matched" : "review",
+      evidence: found
+        ? localized(language, "El CV menciona Perú en los datos personales o laborales.", "The resume mentions Peru in personal or employment details.")
+        : localized(language, "Confirma tu residencia; no debe inferirse únicamente por tus empleos.", "Confirm your residence; it should not be inferred only from employment history."),
+    });
+  }
+  return checks;
 }
 
 function issue(language, key, severity = "warning") {
@@ -327,8 +468,10 @@ function auditStatus(pass, warning = false) {
 }
 
 function requirementFromLabel(label) {
+  const special = SPECIAL_REQUIREMENTS.get(label);
+  if (special) return special;
   const known = REQUIREMENT_GROUPS.find(([knownLabel]) => knownLabel === label);
-  return known ? { label: known[0], aliases: known[1] } : { label, aliases: [label] };
+  return known ? { label: known[0], aliases: known[1], projectable: !NON_PROJECT_REQUIREMENTS.has(label) } : { label, aliases: [label] };
 }
 
 function validateRuleText(value, requirements = []) {
@@ -338,7 +481,7 @@ function validateRuleText(value, requirements = []) {
   const outcomeCount = countMatches(plain, OUTCOME_EXPRESSIONS);
   const hasQuantifiedEvidence = /\d|%|[$€£]/.test(value) || metricCount > 0;
   const matchedKeywords = requirements
-    .filter((requirement) => requirement.aliases.some((alias) => hasTerm(plain, alias)))
+    .filter((requirement) => (requirement.resumeAliases ?? requirement.aliases).some((alias) => hasTerm(plain, alias)))
     .map((requirement) => requirement.label);
   return {
     actionVerbs,
@@ -431,6 +574,7 @@ export function analyzeResume(sourceText, jobDescription = "", language = "es", 
   const sectionCount = Object.values(sections).filter(Boolean).length;
   const dateCount = countMatches(plain, [/\b(?:19|20)\d{2}\b/g, /\b(?:ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic|jan|apr|aug|dec|actualidad|presente|present)\b/g]);
   const jobKeywords = targetMode === "role" ? [] : keywordList(jobDescription);
+  const eligibility = targetMode === "role" ? [] : eligibilityChecks(jobDescription, text, language);
   const lineRuleResults = lines.map((line) => validateRuleText(line, jobKeywords));
   const actionVerbCounts = Object.fromEntries(ACTION_VERBS.map((verb) => [verb, lineRuleResults.filter((rules) => rules.actionVerbs.includes(verb)).length]));
   const actionCount = Object.values(actionVerbCounts).filter((count) => count > 0).length;
@@ -560,7 +704,10 @@ export function analyzeResume(sourceText, jobDescription = "", language = "es", 
   const keywordCounts = Object.fromEntries(jobKeywords.map((requirement) => [requirement.label, lineRuleResults.filter((rules) => rules.matchedKeywords.includes(requirement.label)).length]));
   const matchedRequirements = jobKeywords.filter((requirement) => keywordCounts[requirement.label] > 0);
   const matched = matchedRequirements.map((requirement) => requirement.label);
-  const missing = jobKeywords.filter((requirement) => !matchedRequirements.includes(requirement)).map((requirement) => requirement.label);
+  const missingRequirements = jobKeywords.filter((requirement) => !matchedRequirements.includes(requirement));
+  const missing = missingRequirements.map((requirement) => requirement.label);
+  const projectMissing = missingRequirements.filter((requirement) => requirement.projectable !== false).map((requirement) => requirement.label);
+  const nonProjectMissing = missingRequirements.filter((requirement) => requirement.projectable === false).map((requirement) => requirement.label);
   const matchScore = jobKeywords.length ? Math.round((matched.length / jobKeywords.length) * 100) : null;
   if (matchScore !== null && matchScore >= 70) strengths.push(copy[language].strengths.match);
 
@@ -580,6 +727,7 @@ export function analyzeResume(sourceText, jobDescription = "", language = "es", 
     auditGroups,
     issues,
     strengths,
+    eligibilityChecks: eligibility,
     metrics: {
       wordCount,
       sectionCount,
@@ -588,7 +736,7 @@ export function analyzeResume(sourceText, jobDescription = "", language = "es", 
       checkCount: auditChecks.length,
       passedCount: auditChecks.filter((item) => item.status === "pass").length,
     },
-    keywordMatch: jobKeywords.length ? { score: matchScore, matched, missing } : null,
+    keywordMatch: jobKeywords.length ? { score: matchScore, matched, missing, projectMissing, nonProjectMissing } : null,
     ruleSnapshot: {
       actionVerbCounts,
       metricCount,

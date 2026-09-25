@@ -37,6 +37,7 @@ test("detects professional domains outside software and drafts relevant projects
   assert.equal(inferProfessionalDomain("Revit, BIM y supervisión de obra", "Arquitecta"), "architecture");
   assert.equal(inferProfessionalDomain("Figma e identidad visual", "Diseñador"), "design");
   assert.equal(inferProfessionalDomain("Figma, SEO y campañas", "Desarrollador Full Stack"), "software");
+  assert.equal(inferProfessionalDomain("Diseñador gráfico con Figma e Illustrator", "Backend Developer"), "software");
 
   const result = analyzeResume(legalResume, legalVacancy, "es");
   const proposals = missingKeywordProposals(result, "Abogada corporativa", legalResume, "es");
@@ -62,9 +63,9 @@ test("generates offer-specific projects and includes them in the complete adapte
   const result = analyzeResume(legalResume, legalVacancy, "es");
   const projects = automaticProjectSuggestions(result, "Abogada corporativa", legalResume, "es");
   assert.ok(projects.length >= 1 && projects.length <= 2);
-  assert.deepEqual(projects.flatMap((project) => project.keywords).sort(), [...result.keywordMatch.missing].sort());
+  assert.deepEqual(projects.flatMap((project) => project.coveredKeywords).sort(), [...result.keywordMatch.missing].sort());
   assert.ok(projects.every((project) => project.included && project.mode === "project"));
-  assert.ok(projects.every((project) => /^(Elaborar|Desarrollar|Diseñar|Resolver|Construir)\b/.test(project.text)));
+  assert.ok(projects.every((project) => project.bullets.every((bullet) => /^(Delimitar|Analizar|Redactar|Definir|Desarrollar|Preparar|Construir|Diseñar|Documentar)\b/.test(bullet))));
   for (const project of projects) {
     for (const keyword of project.keywords) assert.match(project.title + " " + project.text, new RegExp(keyword, "i"));
   }
@@ -72,7 +73,7 @@ test("generates offer-specific projects and includes them in the complete adapte
   const completeText = appendConfirmedEvidence(legalResume, projects, "es");
   assert.match(completeText, /Andrea Salazar/);
   assert.match(completeText, /Revisé contratos y preparé expedientes/);
-  assert.match(completeText, /PROYECTOS RELEVANTES/);
+  assert.match(completeText, /PROYECTOS INDEPENDIENTES/);
   for (const keyword of result.keywordMatch.missing) assert.match(completeText, new RegExp(keyword, "i"));
 
   const originalScore = result.score;
@@ -80,7 +81,7 @@ test("generates offer-specific projects and includes them in the complete adapte
   assert.equal(result.score, originalScore);
   assert.match(document.plainText, /Andrea Salazar/);
   assert.match(document.plainText, /Revisar contratos y preparé expedientes/);
-  assert.match(document.plainText, /PROYECTOS RELEVANTES/);
+  assert.match(document.plainText, /PROYECTOS INDEPENDIENTES/);
   for (const project of projects) assert.match(document.plainText, new RegExp(project.title, "i"));
 });
 
@@ -88,7 +89,7 @@ test("builds the one-column reference structure without truncating source bullet
   const result = analyzeResume(legalResume, legalVacancy, "es");
   const adapted = buildAdaptedResume(legalResume, result, "Abogada corporativa", "es");
   assert.equal(adapted.name, "Andrea Salazar");
-  assert.equal(adapted.headline, "Abogada corporativa");
+  assert.equal(adapted.headline, "Abogada junior");
   assert.ok(adapted.contactLines.some((line) => line.includes("andrea@example.com")));
   assert.deepEqual(adapted.sections.slice(0, 3).map((section) => section.kind), ["profile", "experience", "skills"]);
   assert.match(adapted.plainText, /PERFIL PROFESIONAL/);
@@ -133,11 +134,69 @@ Desarrollador · 2022 — Presente
   const vacancy = "Requisitos: Angular, Java, Selenium, SVN, BD e IA.";
   const result = analyzeResume(source, vacancy, "es");
   const projects = automaticProjectSuggestions(result, "Desarrollador Full Stack", source, "es");
+  assert.equal(projects.length, 1);
   assert.equal(projects[0].title, "Aplicación web con Angular y Java");
-  assert.match(projects[0].text, /^Construir .*Angular.*Java\. Automatizar .*Selenium\. Documentar /);
-  assert.equal(projects[1].title, "Aplicación con BD e IA");
-  assert.match(projects[1].text, /^Construir .*BD\. Incorporar .*IA.*\. Gestionar .*SVN\. Documentar /);
+  assert.match(projects[0].text, /^Construir .*Angular.*Java.*BD\. Incorporar .*Inteligencia artificial.*\. Automatizar .*Selenium\. Gestionar .*SVN\. Documentar /);
   assert.ok(projects.every((project) => project.text.split(/(?<=\.)\s+/).every((sentence) => /^(Construir|Automatizar|Incorporar|Gestionar|Integrar|Documentar)\b/.test(sentence))));
+});
+
+test("creates one real dashboard project from related frontend vacancy gaps", () => {
+  const source = `David Beslanga
+Desarrollador frontend con 8 años de experiencia
+david@example.com | Lima, Perú
+EXPERIENCIA PROFESIONAL
+• Implementar componentes responsive y reutilizables con React y TypeScript.
+HABILIDADES
+Frontend: HTML5, CSS3, TypeScript, React y Responsive Design. | Backend y datos: PHP, MySQL y Firebase. | Herramientas: Git y GitHub.
+FORMACIÓN ACADÉMICA
+Bachiller en Ingeniería de Sistemas
+IDIOMAS
+Inglés: intermedio`;
+  const vacancy = `Inglés C1 avanzado. +6 años de experiencia en desarrollo Front-End.
+React o Angular, TypeScript, HTML5, CSS3 y Responsive Design.
+Dashboards orientados a datos, APIs REST seguras, conceptos BI, KPIs, filtros, drill-down y datos gobernados.
+Componentes reutilizables, arquitectura frontend escalable, Git, testing y code review.
+Herramientas de desarrollo asistidas por IA como GitHub Copilot, ChatGPT o Claude.`;
+  const result = analyzeResume(source, vacancy, "es");
+  const projects = automaticProjectSuggestions(result, "Vacante analizada", source, "es");
+
+  assert.equal(projects.length, 1);
+  assert.equal(projects[0].title, "Dashboard empresarial de operaciones y KPIs");
+  assert.equal(projects[0].bullets.length, 4);
+  assert.ok(projects[0].keywords.includes("API REST"));
+  assert.ok(projects[0].keywords.includes("Desarrollo asistido por IA"));
+  assert.ok(!projects[0].keywords.includes("Inglés C1"));
+  assert.match(projects[0].summary, /datos empresariales gobernados/i);
+  assert.match(projects[0].text, /React y TypeScript/);
+  assert.match(projects[0].text, /API REST segura/);
+  assert.match(projects[0].text, /drill-down/);
+  assert.doesNotMatch(projects[0].text, /Proyecto técnico con|\bC1\b/);
+
+  const complete = appendConfirmedEvidence(source, projects, "es");
+  const document = buildAdaptedResume(complete, result, "Vacante analizada", "es");
+  const skills = document.sections.find((section) => section.kind === "skills");
+  assert.deepEqual(skills.blocks.map((block) => block.label), ["Frontend", "Backend y datos", "Herramientas"]);
+  assert.doesNotMatch(document.plainText, /Herramientas: Frontend:/);
+});
+
+test("turns Azure and SOLID into one complete demonstrable project and exports only its concise version", () => {
+  const source = "Lucía Torres\nDesarrolladora backend\nlucia@example.com\nHABILIDADES\nJava y SQL";
+  const result = analyzeResume(source, "Puesto: Backend Developer\nRequisitos: Azure y SOLID.", "es");
+  const projects = automaticProjectSuggestions(result, "Backend Developer", source, "es");
+
+  assert.equal(projects.length, 1);
+  assert.equal(projects[0].title, "Sistema de gestión de incidencias con SLA");
+  assert.equal(projects[0].projectType, "Proyecto independiente");
+  assert.match(projects[0].summary, /MVP profesional/);
+  assert.ok(projects[0].scope.some((item) => /roles de cliente, agente y administrador/i.test(item)));
+  assert.ok(projects[0].deliverables.some((item) => /Demo en línea/i.test(item)));
+  assert.match(projects[0].text, /Azure/);
+  assert.match(projects[0].text, /SOLID/);
+
+  const completeText = appendConfirmedEvidence(source, projects, "es");
+  assert.match(completeText, /Sistema de gestión de incidencias con SLA — Proyecto independiente/);
+  assert.match(completeText, /PROYECTOS INDEPENDIENTES/);
+  assert.doesNotMatch(completeText, /usuarios de prueba y datos precargados/);
 });
 
 test("normalizes dates and keeps all bullet text", () => {
@@ -185,6 +244,46 @@ test("reconstructs a graphic Adobe resume instead of exporting its visual readin
   assert.match(document.plainText, /Herramientas: Adobe XD \| Adobe Photoshop \| Adobe Illustrator \| Adobe InDesign \| Figma \| Procreate/);
   assert.match(document.plainText, /Inglés: Intermedio[\s\S]*Español: Nativo/);
   assert.match(document.plainText, /Baile y música \| Pintura y arte digital \| Gym/);
+});
+
+test("separates a graphic designer headline from the complete personal profile", () => {
+  const source = [
+    "CURRÍCULUM", "Hola,", "soy Genith!",
+    "Soy diseñadora gráfica y actualmente curso el", "último año de la carrera. Vivo en Lima y",
+    "disfruto aprender de manera constante, tanto", "dentro como fuera del ámbito académico. Mi",
+    "principal interés es la ilustración, área en la que", "busco desarrollarme y construir mi identidad", "profesional.",
+    "EXPERIENCIA", "Diseñadora Gráfica (Lingo)", "2025", "Encargada de realizar piezas gráficas.",
+  ].join("\n");
+  const result = analyzeResume(source, "Requisitos: UI/UX e investigación de usuarios.", "es");
+  const document = buildAdaptedResume(source, result, "Convocatoria cargada", "es", { fileName: "CV - Genith Barrera.pdf" });
+  assert.equal(document.headline, "Diseñadora gráfica");
+  const profile = document.sections.find((section) => section.kind === "profile");
+  assert.match(profile.blocks[0].text, /^Soy diseñadora gráfica y actualmente curso el último año de la carrera\./);
+  assert.match(profile.blocks[0].text, /construir mi identidad profesional\.$/);
+});
+
+test("creates one concrete UX project and removes duplicate requirement labels", () => {
+  const result = {
+    score: 42,
+    keywordMatch: {
+      matched: [],
+      missing: ["UI/UX", "UX y UI", "UX", "UI", "Investigación de usuarios", "Investigación", "Comunicación", "Prototipado"],
+    },
+  };
+  const source = "Genith Barrera\nSoy diseñadora gráfica.\nHABILIDADES\nAdobe Illustrator, Figma";
+  const projects = automaticProjectSuggestions(result, "Especialista en campañas publicitarias", source, "es");
+  assert.equal(projects.length, 1);
+  assert.equal(projects[0].domain, "design");
+  assert.equal(projects[0].title, "Rediseño UX/UI de una plataforma de servicios");
+  assert.deepEqual(projects[0].keywords, ["UI/UX", "Investigación de usuarios", "Comunicación", "Prototipado"]);
+  assert.deepEqual(projects[0].coveredKeywords.sort(), [...result.keywordMatch.missing].sort());
+  assert.ok(projects[0].bullets.every((bullet) => /^(Definir|Investigar|Diseñar|Validar)\b/.test(bullet)));
+  assert.match(projects[0].text, /prototipo navegable/);
+  assert.match(projects[0].text, /prueba de usabilidad/);
+
+  const completeText = appendConfirmedEvidence(source, projects, "es");
+  assert.equal((completeText.match(/^• /gm) ?? []).length, projects[0].bullets.length);
+  assert.doesNotMatch(completeText, /Investigación de usuarios e Investigación/);
 });
 
 test("recovers the complete identity, employment and education from a glyph-fragmented PDF", () => {

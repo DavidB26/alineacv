@@ -1039,15 +1039,37 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .saved-resume-versions li time { margin-top: 2px; color: #72828a; font-size: .7rem; }
 .saved-resume-versions li button { min-height: 36px; padding: 6px 9px; border: 1px solid #ccd8dd; border-radius: 8px; color: #385666; background: white; font: inherit; font-size: .75rem; font-weight: 700; cursor: pointer; }
 .automatic-resume-intro { margin: 8px 0 20px; color: #5a7080; font-size: .9375rem; line-height: 1.65; }
+.offer-eligibility { margin: 18px 0 22px; padding: 16px; border: 1px solid #dce3e7; border-radius: 13px; background: #f8fafb; }
+.offer-eligibility h3 { margin: 0; color: #263b4a; font-size: .95rem; }
+.offer-eligibility > p { margin: 6px 0 12px; color: #617482; font-size: .78rem; line-height: 1.55; }
+.offer-eligibility ul { margin: 0; padding: 0; display: grid; gap: 8px; list-style: none; }
+.offer-eligibility li { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-top: 8px; border-top: 1px solid #e4eaed; }
+.offer-eligibility li > div { min-width: 0; display: grid; gap: 2px; }
+.offer-eligibility li strong { color: #263b4a; font-size: .8rem; }
+.offer-eligibility li div span { color: #667985; font-size: .72rem; line-height: 1.45; }
+.offer-eligibility-status { flex: 0 0 auto; padding: 4px 8px; border-radius: 999px; font-size: .68rem; font-weight: 800; }
+.offer-eligibility-status.matched { color: #256048; background: #dff1e8; }
+.offer-eligibility-status.missing { color: #8a4a32; background: #f9e3da; }
+.offer-eligibility-status.review { color: #735615; background: #f8e9bd; }
 .automatic-projects { margin-top: 20px; }
 .automatic-projects > h3 { margin: 0 0 14px; color: #1d3d31; font-size: 1.0625rem; }
 .automatic-projects > div { display: grid; gap: 12px; }
 .automatic-project-card { min-width: 0; padding: 18px; border: 1px solid #cfe0d9; border-radius: 14px; background: #f7fbf9; }
-.automatic-project-card ul { margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 7px; list-style: none; }
-.automatic-project-card li { padding: 5px 8px; border-radius: 999px; color: #236149; background: #dff1e8; font-size: .72rem; font-weight: 800; }
+.automatic-project-card .automatic-project-steps { margin: 9px 0 0; padding-left: 20px; display: grid; gap: 5px; color: #4f6574; font-size: .875rem; line-height: 1.55; list-style: disc; }
+.automatic-project-card .automatic-project-steps li { padding-left: 2px; }
+.automatic-project-card .automatic-project-keywords { margin: 10px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 7px; list-style: none; }
+.automatic-project-card .automatic-project-keywords li { padding: 5px 8px; border-radius: 999px; color: #236149; background: #dff1e8; font-size: .72rem; font-weight: 800; }
 .automatic-project-number { display: block; margin-bottom: 7px; color: #2b7358; font-size: .7rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
 .automatic-project-card h4 { margin: 0; color: #17293a; font-size: 1rem; line-height: 1.4; overflow-wrap: anywhere; }
 .automatic-project-card p { margin: 7px 0 0; color: #4f6574; font-size: .875rem; line-height: 1.65; }
+.automatic-project-summary { max-width: 76ch; }
+.automatic-project-plan { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.automatic-project-plan section { min-width: 0; padding: 13px 14px; border: 1px solid #dce8e3; border-radius: 10px; background: #fff; }
+.automatic-project-plan h5, .automatic-project-cv-preview h5 { margin: 0; color: #253d34; font-size: .78rem; line-height: 1.45; }
+.automatic-project-plan ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 5px; color: #536a60; font-size: .78rem; line-height: 1.5; list-style: disc; }
+.automatic-project-cv-preview { margin-top: 15px; padding: 14px; border: 1px solid #bed9ce; border-radius: 11px; background: #eef7f3; }
+.automatic-project-cv-preview > span { display: block; margin-bottom: 5px; color: #2b7358; font-size: .67rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.automatic-project-cv-preview .automatic-project-steps { margin-top: 7px; color: #3f5c50; font-size: .78rem; }
 .automatic-project-keyword-label { display: block; margin-top: 13px; color: #4c6259; font-size: .72rem; }
 .resume-export-actions { margin-top: 14px; }
 .resume-export-actions button { color: #496272; border-color: #ccd9df; background: #fff; font-weight: 600; }
@@ -1058,6 +1080,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .resume-export-warning > div { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .resume-export-warning button { min-height: 40px; padding: 8px 12px; border: 1px solid #c8a85f; border-radius: 8px; color: #fff; background: #765619; font: inherit; font-size: .8125rem; font-weight: 700; cursor: pointer; }
 .resume-export-warning button + button { color: #5c481f; background: transparent; }
+@media (max-width: 720px) {
+  .offer-eligibility li { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .automatic-project-plan { grid-template-columns: 1fr; }
+  .automatic-project-card { padding: 15px; }
+}
 .ats-technical-group-complete > summary { min-height: 68px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 16px; padding: 14px 18px; background: #f8fbfa; list-style: none; cursor: pointer; }
 .ats-technical-group-complete > summary::-webkit-details-marker { display: none; }
 .ats-technical-group-complete > summary h2 { margin: 0 0 4px; font-size: 1rem; }
