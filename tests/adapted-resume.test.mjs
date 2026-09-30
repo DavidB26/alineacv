@@ -5,6 +5,7 @@ import {
   adaptedSkillPlan,
   adaptedVersionName,
   appendConfirmedEvidence,
+  automaticExperienceSuggestions,
   automaticProjectSuggestions,
   buildAdaptedResume,
   inferProfessionalDomain,
@@ -176,8 +177,40 @@ Herramientas de desarrollo asistidas por IA como GitHub Copilot, ChatGPT o Claud
   const complete = appendConfirmedEvidence(source, projects, "es");
   const document = buildAdaptedResume(complete, result, "Vacante analizada", "es");
   const skills = document.sections.find((section) => section.kind === "skills");
-  assert.deepEqual(skills.blocks.map((block) => block.label), ["Frontend", "Backend y datos", "Herramientas"]);
+  assert.deepEqual(skills.blocks.map((block) => block.label), ["Claves para esta oferta", "Frontend", "Backend y datos", "Herramientas"]);
   assert.doesNotMatch(document.plainText, /Herramientas: Frontend:/);
+});
+
+test("drafts missing requirements under the closest real role and exports only confirmed additions", () => {
+  const source = `Ana Torres
+Desarrolladora frontend
+ana@example.com
+EXPERIENCIA PROFESIONAL
+Desarrolladora Frontend - Empresa Uno | Lima, Perú 2022 - Presente
+• Implementar interfaces con HTML y CSS.
+Asistente de Marketing - Empresa Dos | Lima, Perú 2020 - 2022
+• Diseñar campañas digitales.
+HABILIDADES
+HTML | CSS`;
+  const vacancy = "Puesto: Frontend Developer\nRequisitos: Angular, TypeScript y Selenium.";
+  const result = analyzeResume(source, vacancy, "es");
+  const proposals = automaticExperienceSuggestions(result, "Frontend Developer", source, "es");
+
+  assert.equal(proposals.length, 1);
+  assert.match(proposals[0].roleTitle, /Desarrolladora Frontend - Empresa Uno/);
+  assert.deepEqual(new Set(proposals[0].coveredKeywords), new Set(["Angular", "TypeScript", "Selenium"]));
+  assert.equal(proposals[0].included, false);
+
+  const unconfirmed = buildAdaptedResume(source, result, "Frontend Developer", "es", { confirmedExperienceSuggestions: proposals });
+  assert.doesNotMatch(unconfirmed.plainText, /interfaz en Angular|flujo principal con Selenium/);
+
+  const confirmed = buildAdaptedResume(source, result, "Frontend Developer", "es", {
+    confirmedExperienceSuggestions: proposals.map((proposal) => ({ ...proposal, included: true })),
+  });
+  assert.match(confirmed.plainText, /Desarrolladora Frontend - Empresa Uno[\s\S]*interfaz en Angular/);
+  assert.match(confirmed.plainText, /Claves para esta oferta: TypeScript \| Angular \| Selenium/);
+  assert.doesNotMatch(confirmed.plainText, /Asistente de Marketing[\s\S]*interfaz en Angular/);
+  assert.equal(analyzeResume(confirmed.plainText, vacancy, "es").score, 100);
 });
 
 test("adapts only supported content and keeps missing requirements out of the exported resume", () => {
@@ -254,6 +287,9 @@ Trabajo autónomo y en equipo, atención al detalle, comunicación efectiva y se
     "linkedin.com/in/david-beslanga", "github.com/DavidB26",
   ]);
   assert.match(document.plainText, /estructura orientada a SEO\./);
+  const profile = document.sections.find((section) => section.kind === "profile");
+  assert.match(profile.blocks[0].text, /^Desarrollador frontend con 8 años de experiencia/);
+  assert.match(profile.blocks[0].text, /Experiencia en WordPress, PHP, JavaScript y React/);
   assert.doesNotMatch(document.plainText, /Experiencia demostrada|Alineadas con la oferta|HABILIDADES EN DESARROLLO/);
   assert.doesNotMatch(document.plainText, /Elementor|Divi|Seguridad WordPress/);
   const education = document.sections.find((section) => section.kind === "education");

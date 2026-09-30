@@ -217,7 +217,7 @@ function vacancyLabel(description: string, language: Language) {
   const labeledLine = lines.find((line) => /^(puesto|cargo|posición|position|role|job title)\s*:/i.test(line));
   const explicitTitle = labeledLine?.replace(/^[^:]+:\s*/, "").trim();
   const searchedTitle = description.match(/\b(?:buscamos|se busca|we are looking for)\s+(?:(?:un|una|a|an)\s+)?([^.,;\n]{3,70})/i)?.[1]?.trim();
-  const firstLine = lines[0]?.length <= 70 && !/^(descripción|description|sobre |about |requisitos|requirements|funciones|responsibilities)\b/i.test(lines[0]) ? lines[0] : "";
+  const firstLine = lines[0]?.length <= 70 && !/^(?:[-•*]\s*)?(?:descripción|description|sobre |about |requisitos|requirements|funciones|responsibilities|experiencia|dominio|conocimientos?|manejo|capacidad|disponibilidad)\b/i.test(lines[0]) ? lines[0].replace(/^(?:[-•*]\s*)/, "") : "";
   return explicitTitle || searchedTitle || firstLine || (language === "es" ? "Vacante analizada" : "Analyzed job");
 }
 
@@ -399,7 +399,7 @@ export default function AtsAnalyzer() {
           <p className="ats-focus-private">{es ? "Sin registro. Tu CV y el texto se analizan en este dispositivo." : "No account needed. Your resume and text are analyzed on this device."}</p>
         </form>
       </section> : <section className="ats-workspace has-report" aria-label={es ? "Resultado del análisis" : "Analysis results"}>
-        <AtsReport key={language + targetText} result={result} resumeText={resumeText} fileName={file?.name || (es ? "CV analizado" : "Analyzed resume")} targetLabel={targetLabel} versionName={versionName} language={language} onReset={reset} onEdit={() => setResult(null)} />
+        <AtsReport key={language + targetText} result={result} resumeText={resumeText} jobDescription={jobDescription} fileName={file?.name || (es ? "CV analizado" : "Analyzed resume")} targetLabel={targetLabel} versionName={versionName} language={language} onReset={reset} onEdit={() => setResult(null)} />
       </section>}
       <footer className="ats-focus-footer"><span>AlineaCV</span><p>{es ? "Mejora cómo presentas tu experiencia. Conserva lo que te hace único." : "Improve how you present your experience. Keep what makes you unique."}</p></footer>
     </main>

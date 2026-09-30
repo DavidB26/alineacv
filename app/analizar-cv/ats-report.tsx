@@ -50,9 +50,10 @@ const dictionary = {
   },
 } as const;
 
-export default function AtsReport({ result, resumeText, fileName, targetLabel, versionName, language, onReset, onEdit }: {
+export default function AtsReport({ result, resumeText, jobDescription = "", fileName, targetLabel, versionName, language, onReset, onEdit }: {
   result: ReturnType<typeof analyzeResume>;
   resumeText: string;
+  jobDescription?: string;
   fileName: string;
   targetLabel: string;
   versionName: string;
@@ -98,7 +99,7 @@ export default function AtsReport({ result, resumeText, fileName, targetLabel, v
             </div>
           </section>}
         </div>
-        <ResumeImprovementPlan result={result} originalResumeText={resumeText} fileName={fileName} targetLabel={targetLabel} versionName={versionName} language={language} />
+        <ResumeImprovementPlan result={result} originalResumeText={resumeText} jobDescription={jobDescription} fileName={fileName} targetLabel={targetLabel} versionName={versionName} language={language} />
       </div>
 
       <details className="ats-technical-details">
