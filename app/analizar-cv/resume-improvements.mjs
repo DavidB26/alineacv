@@ -47,13 +47,17 @@ export function repairWrappedResumeLines(sourceText) {
     const datedHeading = /(?:19|20)\d{2}|actualidad|presente|present/i.test(line) && line.length < 180;
     const contact = /@|https?:\/\/|linkedin|\+?\d[\d\s().-]{7,}\d/i.test(line);
     const uppercaseHeading = line.length < 80 && line === line.toUpperCase() && /[\p{L}]/u.test(line);
+    const acronymContinuation = activeBullet >= 0
+      && line.length <= 18
+      && /^[A-ZÁÉÍÓÚÑ0-9/&+.-]+$/.test(line)
+      && /(?:\b(?:a|al|de|del|en|para|por|con|y|e|u|o)|[,;:])\s*$/i.test(repaired[activeBullet]);
     const projectTitle = /^(?:proyecto|project)\s*:\s*/i.test(line);
     const entryHeading = line.length < 190 && /^[A-ZÁÉÍÓÚÑ]/.test(line) && /[|·]/.test(line);
 
     if (bullet) {
       repaired.push(line);
       activeBullet = repaired.length - 1;
-    } else if (activeBullet >= 0 && !section && !datedHeading && !contact && !uppercaseHeading && !projectTitle && !entryHeading) {
+    } else if (activeBullet >= 0 && !section && !datedHeading && !contact && (!uppercaseHeading || acronymContinuation) && !projectTitle && !entryHeading) {
       repaired[activeBullet] += " " + line;
     } else {
       repaired.push(line);

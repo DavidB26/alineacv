@@ -659,7 +659,7 @@ const SECTION_ORDER = ["profile", "specializations", "experience", "projects", "
 
 const SOFT_SKILLS = new Set([
   "Atención al detalle", "Comunicación", "Liderazgo", "Trabajo en equipo", "Resolución de problemas",
-  "Pensamiento analítico", "Negociación", "Gestión de stakeholders", "Servicio al cliente",
+  "Pensamiento analítico", "Negociación", "Gestión de stakeholders", "Servicio al cliente", "Trabajo autónomo",
 ]);
 const NON_SKILL_REQUIREMENTS = new Set(["Inglés", "Portugués", "Inglés C1"]);
 
@@ -674,17 +674,21 @@ export function adaptedSkillPlan(result) {
   };
 }
 
-function adaptProfile(profile, plan, language) {
-  const relevant = [...plan.supportedTechnical, ...plan.supportedSoft].slice(0, 8);
-  if (!relevant.length) return profile;
+function adaptProfile(profile, plan) {
   const base = String(profile ?? "").trim();
-  const present = normalize(base);
-  const additions = relevant.filter((keyword) => !present.includes(normalize(keyword)));
-  if (!additions.length) return base;
-  const sentence = language === "es"
-    ? "Experiencia demostrada en " + joinedKeywords(additions, "es") + ", relevante para esta oferta."
-    : "Demonstrated experience in " + joinedKeywords(additions, "en") + ", relevant to this role.";
-  return [base, sentence].filter(Boolean).join(" ");
+  if (!base) return "";
+  const keywords = [...plan.supportedTechnical, ...plan.supportedSoft].map(normalize);
+  if (!keywords.length) return base;
+  const sentences = base.match(/[^.!?]+[.!?]?/g)?.map((sentence) => sentence.trim()).filter(Boolean) ?? [base];
+  return sentences
+    .map((sentence, index) => ({
+      sentence,
+      index,
+      score: keywords.reduce((total, keyword) => total + (normalize(sentence).includes(keyword) ? 1 : 0), 0),
+    }))
+    .sort((left, right) => right.score - left.score || left.index - right.index)
+    .map(({ sentence }) => sentence)
+    .join(" ");
 }
 
 function appendSkillRow(blocks, label, values) {
@@ -734,7 +738,7 @@ export function buildAdaptedResume(sourceText, result, targetLabel, language = "
 
   const name = inferResumeName(sourceText, options.fileName ?? "", parsed.header);
   const headline = inferResumeHeadline(sourceText, requestedTarget, parsed.header, name);
-  const profile = adaptProfile(recoverProfileText(grouped.get("profile") ?? [], parsed.header, name, headline), skillPlan, language);
+  const profile = adaptProfile(recoverProfileText(grouped.get("profile") ?? [], parsed.header, name, headline), skillPlan);
   grouped.set("profile", profile ? [profile] : []);
 
   const recoveredExperience = recoverExperienceBlocks(grouped.get("experience") ?? [], (value) => polishResumeBullet(value, language));
@@ -752,8 +756,8 @@ export function buildAdaptedResume(sourceText, result, targetLabel, language = "
   for (const kind of SECTION_ORDER) {
     let lines = grouped.get(kind) ?? [];
     const recoveredBlocks = grouped.get(kind + "Blocks");
-    const generatedSkills = kind === "skills" && (skillPlan.supportedTechnical.length || skillPlan.supportedSoft.length);
-    const generatedTraining = kind === "training" && (skillPlan.developingTechnical.length || skillPlan.developingSoft.length);
+    const generatedSkills = kind === "skills" && !lines.length && (skillPlan.supportedTechnical.length || skillPlan.supportedSoft.length);
+    const generatedTraining = false;
     if (!lines.length && !recoveredBlocks?.length && !generatedSkills && !generatedTraining) continue;
     if (kind === "experience" || kind === "projects") lines = prioritizeSectionLines(lines, matched, language);
     else lines = lines.map(normalizeResumeDates);
@@ -761,13 +765,13 @@ export function buildAdaptedResume(sourceText, result, targetLabel, language = "
     if ((kind === "experience" || kind === "projects") && recoveredBlocks) blocks = prioritizeEntryBlocks(blocks, matched);
     if (kind === "skills") {
       blocks = skillBlocks(lines, language);
-      blocks = appendSkillRow(blocks, language === "es" ? "Alineadas con la oferta" : "Aligned with the role", skillPlan.supportedTechnical);
-      blocks = appendSkillRow(blocks, language === "es" ? "Competencias demostradas" : "Demonstrated strengths", skillPlan.supportedSoft);
+      if (!lines.length) {
+        blocks = appendSkillRow(blocks, language === "es" ? "Habilidades relevantes" : "Relevant skills", skillPlan.supportedTechnical);
+        blocks = appendSkillRow(blocks, language === "es" ? "Competencias" : "Strengths", skillPlan.supportedSoft);
+      }
     }
     if (kind === "training") {
-      blocks = lines.length ? sectionBlocks(kind, lines, language) : [];
-      blocks = appendSkillRow(blocks, language === "es" ? "Habilidades técnicas en desarrollo" : "Technical skills in development", skillPlan.developingTechnical);
-      blocks = appendSkillRow(blocks, language === "es" ? "Competencias en desarrollo" : "Strengths in development", skillPlan.developingSoft);
+      blocks = sectionBlocks(kind, lines, language);
     }
     if (kind === "languages") blocks = languageBlocks(lines);
     if (kind === "interests") blocks = interestBlocks(lines);

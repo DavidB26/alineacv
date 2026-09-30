@@ -19,11 +19,16 @@ type AdaptedDocument = {
 };
 
 export function ReferenceResumeDocument({ resume, language }: { resume: AdaptedDocument; language: Language }) {
+  const linkPattern = /^(?:https?:\/\/|www\.|(?:linkedin|github|behance|dribbble)\.com\/)|\.(?:com|net|org|io|dev|pe|co)(?:\/|$)/i;
+  const contactRows = [
+    resume.contactLines.filter((line) => line.includes("@") || !linkPattern.test(line)),
+    resume.contactLines.filter((line) => !line.includes("@") && linkPattern.test(line)),
+  ].filter((row) => row.length > 0);
   return <article className="ats-export-document reference-resume" lang={language}>
     <header className="reference-resume-header">
       <h1>{resume.name}</h1>
       <p>{resume.headline}</p>
-      {resume.contactLines.length > 0 && <div>{resume.contactLines.map((line, index) => <span key={index}>{line}</span>)}</div>}
+      {contactRows.length > 0 && <div>{contactRows.map((row, rowIndex) => <p className="reference-contact-row" key={rowIndex}>{row.map((line, index) => <span key={index}>{line}</span>)}</p>)}</div>}
     </header>
     <main>
       {resume.sections.map((section) => <section className={"reference-section reference-section-" + section.kind} key={section.kind}>
@@ -59,7 +64,7 @@ export default function ResumeImprovementPlan({ result, originalResumeText, file
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle");
   const eligibility = result.eligibilityChecks ?? [];
   const hasTechnicalRequirements = Boolean(skills.supportedTechnical.length + skills.supportedSoft.length + skills.developingTechnical.length + skills.developingSoft.length);
-  const adaptedCoverage = hasTechnicalRequirements ? 100 : null;
+  const requirementsToConfirm = skills.developingTechnical.length + skills.developingSoft.length;
 
   useEffect(() => {
     if (!printing) return;
@@ -89,14 +94,14 @@ export default function ResumeImprovementPlan({ result, originalResumeText, file
   return <section className="resume-improvement-plan adapted-resume-plan" aria-labelledby="improvement-plan-title">
     <h2 id="improvement-plan-title">{es ? "Tu CV adaptado está listo" : "Your tailored resume is ready"}</h2>
     <p className="automatic-resume-intro">{es
-      ? "Priorizamos la experiencia más relevante, ajustamos el perfil y organizamos las habilidades con el lenguaje de la oferta. No añadimos empleos ni responsabilidades inexistentes."
-      : "We prioritized the most relevant experience, tailored the summary and organized skills using the job's language. We did not add nonexistent jobs or responsibilities."}</p>
+      ? "Priorizamos tu experiencia y tus habilidades comprobables según la oferta. Los requisitos que no aparecen en tu CV quedan señalados para que los revises; no se añaden al PDF como si ya los dominaras."
+      : "We prioritized your verifiable experience and skills for the role. Requirements not shown in your resume remain flagged for review and are not added to the PDF as proven skills."}</p>
 
     <div className="adapted-score-grid" aria-label={es ? "Comparación de cobertura" : "Coverage comparison"}>
       <section><span>{es ? "Coincidencia respaldada" : "Supported match"}</span><strong>{result.score ?? "—"}{result.score !== null ? "%" : ""}</strong><p>{es ? "Basada en información ya presente en tu CV." : "Based on information already present in your resume."}</p></section>
-      <section><span>{es ? "Cobertura técnica adaptada" : "Tailored technical coverage"}</span><strong>{adaptedCoverage ?? "—"}{adaptedCoverage !== null ? "%" : ""}</strong><p>{es ? "Incluye los términos faltantes como habilidades en desarrollo." : "Includes missing terms as skills in development."}</p></section>
+      <section><span>{es ? "Requisitos por acreditar" : "Requirements to verify"}</span><strong>{hasTechnicalRequirements ? requirementsToConfirm : "—"}</strong><p>{es ? "No se incluyen en el CV hasta que exista evidencia real." : "They are not included until the resume contains real evidence."}</p></section>
     </div>
-    <p className="adapted-score-note">{es ? "La cobertura técnica indica que los términos fueron ubicados en el CV; no acredita dominio ni garantiza una entrevista." : "Technical coverage means the terms were placed in the resume; it does not prove proficiency or guarantee an interview."}</p>
+    <p className="adapted-score-note">{es ? "El porcentaje no aumenta por repetir palabras: solo cambia cuando el CV contiene evidencia relacionada con cada requisito." : "The percentage does not rise by repeating keywords; it changes only when the resume contains evidence related to each requirement."}</p>
 
     <section className="adapted-changes" aria-labelledby="adapted-changes-title">
       <h3 id="adapted-changes-title">{es ? "Qué adaptamos" : "What we tailored"}</h3>
@@ -104,8 +109,8 @@ export default function ResumeImprovementPlan({ result, originalResumeText, file
         <li><strong>{es ? "Perfil y experiencia" : "Summary and experience"}</strong><span>{es ? "Priorizados según las coincidencias reales con la oferta." : "Prioritized using real matches with the job."}</span></li>
         {skills.supportedTechnical.length > 0 && <li><strong>{es ? "Habilidades demostradas" : "Demonstrated skills"}</strong><span>{skills.supportedTechnical.join(" · ")}</span></li>}
         {skills.supportedSoft.length > 0 && <li><strong>{es ? "Competencias demostradas" : "Demonstrated strengths"}</strong><span>{skills.supportedSoft.join(" · ")}</span></li>}
-        {skills.developingTechnical.length > 0 && <li><strong>{es ? "Habilidades técnicas en desarrollo" : "Technical skills in development"}</strong><span>{skills.developingTechnical.join(" · ")}</span></li>}
-        {skills.developingSoft.length > 0 && <li><strong>{es ? "Competencias en desarrollo" : "Strengths in development"}</strong><span>{skills.developingSoft.join(" · ")}</span></li>}
+        {skills.developingTechnical.length > 0 && <li><strong>{es ? "Habilidades no acreditadas" : "Unverified skills"}</strong><span>{skills.developingTechnical.join(" · ")}</span></li>}
+        {skills.developingSoft.length > 0 && <li><strong>{es ? "Competencias por confirmar" : "Strengths to confirm"}</strong><span>{skills.developingSoft.join(" · ")}</span></li>}
       </ul>
     </section>
 
@@ -124,7 +129,7 @@ export default function ResumeImprovementPlan({ result, originalResumeText, file
       <button className="primary" type="button" onClick={() => setPrinting(true)} disabled={printing}>{es ? "Descargar CV adaptado en PDF" : "Download tailored resume as PDF"} <span aria-hidden="true">↓</span></button>
       <button type="button" onClick={() => void copyResume()}>{copyStatus === "copied" ? (es ? "Copiado ✓" : "Copied ✓") : (es ? "Copiar CV adaptado" : "Copy tailored resume")}</button>
     </div>
-    <p className="resume-export-note">{es ? "La descarga conserva tus empresas, cargos y experiencia original; reorganiza el contenido y distingue las habilidades en desarrollo." : "The download keeps your original employers, roles and experience; it reorganizes the content and distinguishes skills in development."}</p>
+    <p className="resume-export-note">{es ? "La descarga conserva tus datos, empresas, cargos y experiencia original. Solo reorganiza el contenido respaldado por tu CV." : "The download keeps your original details, employers, roles and experience. It only reorganizes content supported by your resume."}</p>
     {copyStatus === "error" && <p className="resume-copy-status" role="status">{es ? "No se pudo copiar. Puedes descargar el PDF." : "Could not copy. You can download the PDF."}</p>}
     {printing && createPortal(<ReferenceResumeDocument resume={adaptedResume} language={language} />, document.body)}
   </section>;

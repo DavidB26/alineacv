@@ -176,11 +176,11 @@ Herramientas de desarrollo asistidas por IA como GitHub Copilot, ChatGPT o Claud
   const complete = appendConfirmedEvidence(source, projects, "es");
   const document = buildAdaptedResume(complete, result, "Vacante analizada", "es");
   const skills = document.sections.find((section) => section.kind === "skills");
-  assert.deepEqual(skills.blocks.map((block) => block.label), ["Frontend", "Backend y datos", "Herramientas", "Alineadas con la oferta"]);
+  assert.deepEqual(skills.blocks.map((block) => block.label), ["Frontend", "Backend y datos", "Herramientas"]);
   assert.doesNotMatch(document.plainText, /Herramientas: Frontend:/);
 });
 
-test("adapts a resume to full technical coverage without inventing projects or eligibility", () => {
+test("adapts only supported content and keeps missing requirements out of the exported resume", () => {
   const source = `David Beslanga
 51 999 111 222 | david@example.com | Lima, Perú
 Desarrollador frontend con 8 años de experiencia
@@ -208,11 +208,56 @@ Inglés intermedio`;
   assert.ok(plan.developingTechnical.includes("Code review"));
   assert.ok(![...plan.supportedTechnical, ...plan.developingTechnical].includes("Inglés C1"));
   assert.doesNotMatch(document.plainText, /PROYECTOS (?:INDEPENDIENTES|RELEVANTES)/);
-  assert.match(document.plainText, /HABILIDADES EN DESARROLLO/);
-  assert.match(document.plainText, /Habilidades técnicas en desarrollo: [^\n]*Testing[^\n]*Code review[^\n]*API REST/);
+  assert.doesNotMatch(document.plainText, /HABILIDADES EN DESARROLLO/);
+  assert.doesNotMatch(document.plainText, /Testing|Code review|API REST/);
   assert.match(document.plainText, /Frontend Developer · Empresa Real/);
   assert.match(document.plainText, /• Implementar componentes reutilizables con React y TypeScript\.[\s\S]*• Coordinar entregas/);
-  assert.match(document.plainText, /Experiencia demostrada en/);
+  assert.doesNotMatch(document.plainText, /Experiencia demostrada en/);
+});
+
+test("preserves each resume identity and structure while adapting a WordPress vacancy", () => {
+  const source = `David Beslanga
+Frontend Developer | Desarrollo Web, CMS y Performance
++51 926 698 827 | contact@davidbeslanga.com | Lima, Perú
+davidbeslanga.com | linkedin.com/in/david-beslanga | github.com/DavidB26
+PERFIL PROFESIONAL
+Desarrollador frontend con 8 años de experiencia en creación y optimización de sitios e interfaces responsive. Experiencia en WordPress, PHP, JavaScript y React, con enfoque en SEO técnico y rendimiento.
+EXPERIENCIA PROFESIONAL
+Frontend Developer - Verisure | Lima, Perú 05/2023 - Presente
+• Desarrollar el Observatorio de Seguridad en WordPress con datos dinámicos y estructura orientada a
+SEO.
+Desarrollador Web Freelance - Proyectos a medida | Remoto 2018 - Presente
+• Personalizar plugins, métodos de envío, formularios y flujos de captura de datos.
+• Colaborar con equipos multidisciplinarios en diseño y comunicación, y aplicar controles de calidad.
+HABILIDADES TÉCNICAS
+Frontend: HTML5, CSS3, JavaScript.
+Backend: PHP.
+CMS: WordPress, personalización de plugins.
+Herramientas: Git.
+EDUCACIÓN
+UniRitter, Brasil 2017 - 2018
+Bachiller en Ingeniería de Sistemas
+Instituto Cibertec 2016 - 2017
+Diplomado en Gestión e Innovación de Tecnologías de la Información`;
+  const vacancy = `Experiencia comprobada en desarrollo web (portafolio requerido).
+Dominio de HTML, CSS, JavaScript y PHP.
+Manejo avanzado de WordPress y constructores como Elementor y Divi.
+Control de versiones con Git, SEO técnico, temas y plugins personalizados.
+Trabajo autónomo y en equipo, atención al detalle, comunicación efectiva y seguridad WordPress.`;
+  const result = analyzeResume(source, vacancy, "es");
+  const document = buildAdaptedResume(source, result, "Desarrollador WordPress", "es", { fileName: "cv-Beslanga.pdf" });
+
+  assert.ok(result.score > 0 && result.score < 100);
+  assert.deepEqual(result.keywordMatch.missing, ["Elementor", "Divi", "Temas WordPress personalizados", "Seguridad WordPress"]);
+  assert.deepEqual(document.contactLines, [
+    "+51 926 698 827", "contact@davidbeslanga.com", "Lima, Perú", "davidbeslanga.com",
+    "linkedin.com/in/david-beslanga", "github.com/DavidB26",
+  ]);
+  assert.match(document.plainText, /estructura orientada a SEO\./);
+  assert.doesNotMatch(document.plainText, /Experiencia demostrada|Alineadas con la oferta|HABILIDADES EN DESARROLLO/);
+  assert.doesNotMatch(document.plainText, /Elementor|Divi|Seguridad WordPress/);
+  const education = document.sections.find((section) => section.kind === "education");
+  assert.deepEqual(education.blocks[0], { type: "entry", title: "UniRitter, Brasil", date: "2017 - 2018", meta: ["Bachiller en Ingeniería de Sistemas"], bullets: [] });
 });
 
 test("turns Azure and SOLID into one complete demonstrable project and exports only its concise version", () => {

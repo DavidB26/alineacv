@@ -807,18 +807,19 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 }
 @media print {
   body.alineacv-printing > * { display: none !important; }
-  body.alineacv-printing > .ats-export-document { display: block !important; page: ats-resume; width: auto; min-height: 0; margin: 0; padding: 0; color: #111; background: white; font-family: Arial, Helvetica, sans-serif; font-size: 9.25pt; line-height: 1.36; overflow-wrap: anywhere; }
+  body.alineacv-printing > .ats-export-document { display: block !important; page: ats-resume; width: auto; min-height: 0; margin: 0; padding: 0; color: #111; background: white; font-family: Arial, Helvetica, sans-serif; font-size: 9.7pt; line-height: 1.38; overflow-wrap: anywhere; }
   .reference-resume-header { margin: 0 0 5mm; text-align: center; break-after: avoid; }
   .reference-resume-header h1 { margin: 0; font-size: 17pt; line-height: 1.15; letter-spacing: .01em; }
-  .reference-resume-header > p { margin: 1.1mm 0 1.6mm; font-size: 10.5pt; font-weight: 700; }
-  .reference-resume-header > div { display: flex; flex-wrap: wrap; justify-content: center; gap: .8mm 2.5mm; font-size: 8.3pt; }
-  .reference-resume-header > div span + span::before { margin-right: 2.5mm; content: "|"; }
+  .reference-resume-header > p { margin: 1.1mm 0 1.6mm; font-size: 10.5pt; font-weight: 600; }
+  .reference-resume-header > div { font-size: 8.3pt; }
+  .reference-resume-header .reference-contact-row { display: flex; flex-wrap: wrap; justify-content: center; gap: .8mm 2.5mm; margin: 0 0 .6mm; }
+  .reference-contact-row span + span::before { margin-right: 2.5mm; content: "|"; }
   .reference-resume p { margin: 0 0 1.2mm; white-space: normal; orphans: 3; widows: 3; }
   .reference-section { margin-top: 3.6mm; }
   .reference-section h2 { margin: 0 0 2.1mm; padding-bottom: .8mm; border-bottom: .7px solid #222; font-size: 10.5pt; line-height: 1.2; letter-spacing: .035em; break-after: avoid; }
   .reference-entry { margin-bottom: 2.3mm; break-inside: avoid; }
   .reference-entry > header { display: flex; align-items: baseline; justify-content: space-between; gap: 5mm; margin-bottom: .7mm; break-after: avoid; }
-  .reference-entry > header strong { font-size: 9.25pt; }
+  .reference-entry > header strong { font-size: 9.7pt; }
   .reference-entry > header time { flex: 0 0 auto; font-size: 8.7pt; font-weight: 700; }
   .reference-entry-meta { font-style: italic; }
   .reference-entry ul { margin: 1mm 0 0 5.5mm; padding: 0 0 0 3mm; list-style: disc outside !important; }
@@ -829,7 +830,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .reference-section-projects .reference-entry { margin-bottom: 3mm; }
   .reference-section-projects .reference-entry > header strong { font-size: 9.4pt; }
   .reference-section-projects, .reference-section-skills, .reference-section-certifications, .reference-section-education, .reference-section-languages { break-inside: avoid; }
-  @page ats-resume { size: A4; margin: 12mm 15mm 14mm; }
+  @page ats-resume { size: A4; margin: 12mm 18mm 14mm; }
 }
 
 /* Focused ATS landing: one task, two inputs, navy and mint brand. */

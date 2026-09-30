@@ -97,6 +97,34 @@ Herramientas de desarrollo asistidas por IA como GitHub Copilot, ChatGPT o Claud
   assert.equal(result.eligibilityChecks.find((item) => item.id === "eligibility-location").status, "matched");
 });
 
+test("analyzes a WordPress vacancy as distinct requirements instead of loose words", () => {
+  const resume = `David Beslanga
+contact@davidbeslanga.com | Lima, Perú | davidbeslanga.com | github.com/DavidB26
+Desarrollador frontend con 8 años de experiencia en desarrollo web, WordPress, PHP, JavaScript, HTML5, CSS3 y SEO técnico.
+EXPERIENCIA PROFESIONAL
+• Personalizar plugins, formularios y flujos de captura de datos en WordPress.
+• Gestionar actualizaciones y controles de calidad después de cada publicación.
+• Colaborar con equipos multidisciplinarios en diseño, contenido y comunicación.
+Desarrollador Web Freelance | 2018 - Presente
+HABILIDADES
+Git, WordPress, PHP, HTML5, CSS3, JavaScript.`;
+  const vacancy = `Experiencia comprobada en desarrollo web (portafolio requerido).
+Dominio de HTML, CSS, JavaScript y PHP.
+WordPress con Elementor y Divi. Git. SEO técnico y optimización web.
+Temas y plugins personalizados. Trabajo autónomo y en equipo.
+Atención al detalle, comunicación efectiva y seguridad WordPress.`;
+  const result = analyzeResume(resume, vacancy, "es");
+
+  assert.equal(result.score, Math.round((result.keywordMatch.matched.length / (result.keywordMatch.matched.length + result.keywordMatch.missing.length)) * 100));
+  assert.ok(result.score < 100);
+  assert.deepEqual(result.keywordMatch.missing, ["Elementor", "Divi", "Temas WordPress personalizados", "Seguridad WordPress"]);
+  assert.ok(result.keywordMatch.matched.includes("Plugins WordPress personalizados"));
+  assert.ok(result.keywordMatch.matched.includes("Trabajo autónomo"));
+  assert.ok(result.keywordMatch.matched.includes("Trabajo en equipo"));
+  assert.ok(result.keywordMatch.matched.includes("Atención al detalle"));
+  assert.equal(result.eligibilityChecks.find((item) => item.id === "eligibility-portfolio").status, "matched");
+});
+
 test("collapses overlapping UX and research requirements before calculating the score", () => {
   const resume = "Diseñadora gráfica con experiencia en Figma y branding.";
   const vacancy = "Requisitos: UI/UX, UX, UI, investigación de usuarios, investigación, comunicación, Figma y branding.";

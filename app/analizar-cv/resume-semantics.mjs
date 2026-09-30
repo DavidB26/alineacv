@@ -97,11 +97,13 @@ export function inferResumeHeadline(sourceText, requestedTarget = "", header = [
 export function extractResumeContacts(sourceText) {
   const text = clean(sourceText);
   const emails = [...text.matchAll(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g)].map((match) => match[0]);
-  const urls = [...text.matchAll(/(?:https?:\/\/|www\.)[^\s|]+|\b(?:linkedin\.com|behance\.net)\/[^\s|]+/gi)].map((match) => match[0].replace(/[.,;]+$/, ""));
+  const urls = [...text.matchAll(/(?:https?:\/\/|www\.)[^\s|]+|\b(?:linkedin\.com|behance\.net|github\.com|dribbble\.com)\/[^\s|]+|\b(?:[a-z0-9-]+\.)+(?:com|net|org|io|dev|pe|co)(?:\/[^\s|]*)?/gi)]
+    .filter((match) => match.index === 0 || text[(match.index ?? 0) - 1] !== "@")
+    .map((match) => match[0].replace(/[.,;]+$/, ""));
   const sourceLines = sourceText.split(/\r?\n/).map(clean);
   const phones = sourceLines.flatMap((line) => [...line.matchAll(/(?:\+?\d[\d \t().-]{7,}\d)/g)].map((match) => clean(match[0])))
     .filter((value) => value.replace(/\D/g, "").length >= 9 && !/^(?:19|20)\d{2}\s*[-–—]/.test(value));
-  const locations = sourceLines.filter((line) => {
+  const locations = sourceLines.flatMap((line) => line.split(/[|•]/).map(clean)).filter((line) => {
     if (!/^[\p{L} .'-]{2,35},\s*[\p{L} .'-]{2,35}$/u.test(line) || PROFESSION.test(line)) return false;
     const parts = line.split(",").map((part) => part.trim().split(/\s+/).length);
     return line.length <= 45 && parts[0] <= 3 && parts[1] <= 3;
@@ -214,18 +216,39 @@ export function recoverEducationBlocks(lines) {
   const source = lines.map(clean).filter((line) => line && !CONTACT_LIKE.test(line));
   const entries = [];
   let pending = [];
-  for (const line of source) {
+  let current = null;
+  const pushCurrent = () => {
+    if (!current) return;
+    entries.push(current);
+    current = null;
+  };
+  for (let index = 0; index < source.length; index += 1) {
+    const line = source[index];
     const dated = dateParts(line);
     if (!dated) {
-      pending.push(line);
+      const nextDated = dateParts(source[index + 1] ?? "");
+      if (current && current.meta.length && nextDated) {
+        pushCurrent();
+        pending.push(line);
+      } else if (current) current.meta.push(line);
+      else pending.push(line);
       continue;
     }
+    pushCurrent();
     const detail = dated.before || dated.after;
-    const title = pending.shift() || detail || "Formación";
-    const meta = [...pending, ...(detail && plain(detail) !== plain(title) ? [detail] : [])];
-    entries.push({ type: "entry", title, date: dated.date, meta, bullets: [] });
+    if (pending.length) {
+      const title = pending.shift();
+      current = {
+        type: "entry",
+        title,
+        date: dated.date,
+        meta: [...pending, ...(detail && plain(detail) !== plain(title) ? [detail] : [])],
+        bullets: [],
+      };
+    } else current = { type: "entry", title: detail || "Formación", date: dated.date, meta: [], bullets: [] };
     pending = [];
   }
+  pushCurrent();
   if (pending.length) entries.push({ type: "entry", title: pending.shift(), date: "", meta: pending, bullets: [] });
   return entries.length ? entries : null;
 }

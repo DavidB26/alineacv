@@ -58,6 +58,11 @@ const REQUIREMENT_GROUPS = [
   ["Code review", ["code review", "revision de codigo", "revisiones de codigo"]],
   ["Arquitectura frontend escalable", ["arquitectura frontend escalable", "arquitecturas frontend escalables", "componentes reutilizables", "componentes responsive y reutilizables", "reutilizables", "reusable components", "scalable frontend architecture"]],
   ["WordPress", ["wordpress"]],
+  ["Elementor", ["elementor"]],
+  ["Divi", ["divi", "divi builder"]],
+  ["Temas WordPress personalizados", ["temas wordpress personalizados", "desarrollo de temas wordpress", "temas y plugins personalizados", "custom wordpress themes", "wordpress theme development"]],
+  ["Plugins WordPress personalizados", ["plugins wordpress personalizados", "plugins personalizados", "personalizacion de plugins", "personalizar plugins", "temas y plugins personalizados", "custom wordpress plugins", "wordpress plugin development"]],
+  ["Seguridad WordPress", ["seguridad wordpress", "seguridad para wordpress", "seguridad de wordpress", "wordpress security", "wordpress hardening", "hardening de wordpress"]],
   ["Drupal", ["drupal"]],
   ["Figma", ["figma"]],
   ["Adobe Photoshop", ["photoshop", "adobe photoshop"]],
@@ -163,10 +168,11 @@ const REQUIREMENT_GROUPS = [
   ["Docencia", ["docencia", "teaching"]],
   ["Redacción", ["redaccion", "writing", "copywriting"]],
   ["Gestión documental", ["gestion documental", "document management"]],
-  ["Atención al detalle", ["atencion al detalle", "attention to detail"]],
+  ["Atención al detalle", ["atencion al detalle", "attention to detail", "controles de calidad", "control de calidad"]],
   ["Comunicación", ["comunicacion", "communication"]],
   ["Liderazgo", ["liderazgo", "leadership"]],
-  ["Trabajo en equipo", ["trabajo en equipo", "teamwork"]],
+  ["Trabajo autónomo", ["trabajo autonomo", "forma autonoma", "autonomous work", "work independently", "independently", "freelance"]],
+  ["Trabajo en equipo", ["trabajo en equipo", "trabajar en equipo", "autonomo y en equipo", "autonoma y en equipo", "forma autonoma y en equipo", "equipos multidisciplinarios", "teamwork", "cross-functional teams"]],
   ["Resolución de problemas", ["resolucion de problemas", "problem solving"]],
   ["Pensamiento analítico", ["pensamiento analitico", "analytical thinking"]],
   ["Inglés", ["ingles", "english"]],
@@ -449,6 +455,17 @@ function eligibilityChecks(jobDescription, resumeText, language) {
       evidence: found
         ? localized(language, "El CV menciona Perú en los datos personales o laborales.", "The resume mentions Peru in personal or employment details.")
         : localized(language, "Confirma tu residencia; no debe inferirse únicamente por tus empleos.", "Confirm your residence; it should not be inferred only from employment history."),
+    });
+  }
+  if (/\b(?:portafolio|portfolio)\b/.test(job)) {
+    const found = /(?:https?:\/\/|www\.|\b(?:github\.com|behance\.net|dribbble\.com|portfolio\.)|\b[a-z0-9-]+\.(?:com|net|org|io|dev|pe|co)\b)/i.test(resumeText);
+    checks.push({
+      id: "eligibility-portfolio",
+      label: localized(language, "Portafolio profesional", "Professional portfolio"),
+      status: found ? "matched" : "review",
+      evidence: found
+        ? localized(language, "El CV incluye al menos un enlace profesional para revisión.", "The resume includes at least one professional link for review.")
+        : localized(language, "Añade un enlace directo a trabajos que puedas demostrar.", "Add a direct link to work you can demonstrate."),
     });
   }
   return checks;

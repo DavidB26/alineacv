@@ -52,6 +52,16 @@ Desarrollador web · 05/2023 — Presente
   assert.match(repaired, /\nDesarrollador web · 05\/2023 — Presente\n/);
 });
 
+test("joins an uppercase acronym that continues a wrapped bullet", () => {
+  const extracted = `EXPERIENCIA PROFESIONAL
+• Desarrollar un portal en WordPress con estructura orientada a
+SEO.
+• Construir componentes reutilizables.`;
+  const repaired = repairWrappedResumeLines(extracted);
+  assert.match(repaired, /estructura orientada a SEO\./);
+  assert.doesNotMatch(repaired, /\nSEO\./);
+});
+
 test("removes printed page labels without polluting the name or the last bullet", () => {
   const extracted = `David Beslanga Rabanal | CV profesional Página 1
 David Beslanga Rabanal
@@ -106,7 +116,7 @@ test("keeps the checklist short and never tells the user to invent a missing ski
   assert.equal(JSON.stringify(result), original);
 });
 
-test("adapts the resume with demonstrated and developing skills", () => {
+test("adapts the resume while separating supported and unverified skills", () => {
   const result = analyzeResume(resume, vacancy, "es");
   const html = renderToStaticMarkup(createElement(AtsReport, { result, resumeText: resume, fileName: "camila-cv.pdf", targetLabel: "Desarrollador frontend", versionName: "CV - Acme - Desarrollador frontend", language: "es", onReset() {}, onEdit() {} }));
   assert.match(html, /Coincidencia actual del CV/);
@@ -117,10 +127,10 @@ test("adapts the resume with demonstrated and developing skills", () => {
   assert.match(html, /Descargar CV adaptado en PDF/);
   assert.match(html, /Copiar CV adaptado/);
   assert.match(html, /Coincidencia respaldada/);
-  assert.match(html, /Cobertura técnica adaptada/);
+  assert.match(html, /Requisitos por acreditar/);
   assert.match(html, /Habilidades demostradas/);
   assert.match(html, /TypeScript · React/);
-  assert.match(html, /Habilidades técnicas en desarrollo/);
+  assert.match(html, /Habilidades no acreditadas/);
   assert.match(html, /Docker/);
   assert.doesNotMatch(html, /Proyecto independiente|Proyecto completo recomendado|Qué debe incluir|Versión breve que irá al CV/);
   assert.doesNotMatch(html, /Usar este borrador|Confirmo que puedo respaldarlo e incluirlo|Versión guardada/);
@@ -129,7 +139,7 @@ test("adapts the resume with demonstrated and developing skills", () => {
   assert.match(html, /class="matched" aria-label="React: Encontradas"/);
   assert.match(html, /class="missing" aria-label="Docker: No encontradas"/);
   assert.match(html, /<strong>67<\/strong><span>%<\/span>/);
-  assert.match(html, /<span>Cobertura técnica adaptada<\/span><strong>100%<\/strong>/);
+  assert.match(html, /<span>Requisitos por acreditar<\/span><strong>1<\/strong>/);
   assert.match(html, /0–49 Baja/);
   assert.match(html, /50–79 Parcial/);
   assert.match(html, /80–100 Alta/);
@@ -143,7 +153,7 @@ test("adapts the resume with demonstrated and developing skills", () => {
   assert.ok(html.indexOf("ats-audit-checks") < html.indexOf("ats-passed-checks"));
   assert.match(html, /class="ats-passed-check"/);
   assert.doesNotMatch(html, /0 por revisar/);
-  assert.match(html, /La descarga conserva tus empresas, cargos y experiencia original/);
+  assert.match(html, /La descarga conserva tus datos, empresas, cargos y experiencia original/);
   assert.doesNotMatch(html, /<form|Puesto que buscas|Habilidades para la búsqueda|ats-report-sidebar/);
   assert.doesNotMatch(html, /similar-remote-title/);
 });
@@ -168,7 +178,7 @@ test("does not render an invented percentage when requirements cannot be identif
   assert.match(html, /No measurable score/);
   assert.match(html, /<div class="ats-match-number"><strong>—<\/strong><\/div>/);
   assert.match(html, /Your tailored resume is ready/);
-  assert.match(html, /<span>Tailored technical coverage<\/span><strong>—<\/strong>/);
+  assert.match(html, /<span>Requirements to verify<\/span><strong>—<\/strong>/);
 });
 
 test("job-title guidance does not invent a job score or employer requirements", () => {

@@ -361,7 +361,7 @@ export default function AtsAnalyzer() {
           <ul className="ats-focus-benefits">
             <li><span>01</span><div><strong>{es ? "Qué coincide con la oferta" : "What matches the job"}</strong><p>{es ? "Palabras clave presentes y requisitos que conviene revisar." : "Keywords already present and requirements to review."}</p></div></li>
             <li><span>02</span><div><strong>{es ? "Contenido adaptado" : "Tailored content"}</strong><p>{es ? "Priorizamos el perfil, la experiencia y las habilidades relevantes para esa oferta." : "We prioritize the summary, experience and skills relevant to that job."}</p></div></li>
-            <li><span>03</span><div><strong>{es ? "Un CV completo para postular" : "A complete resume ready to apply"}</strong><p>{es ? "Descarga una versión ATS con habilidades demostradas y habilidades en desarrollo claramente separadas." : "Download an ATS version with demonstrated and developing skills clearly separated."}</p></div></li>
+            <li><span>03</span><div><strong>{es ? "Un CV completo para postular" : "A complete resume ready to apply"}</strong><p>{es ? "Descarga una versión ATS que conserva tu trayectoria y prioriza la evidencia relevante para la oferta." : "Download an ATS version that preserves your background and prioritizes evidence relevant to the role."}</p></div></li>
           </ul>
           <p className="ats-focus-limits">{es ? "ATS es el sistema que algunas empresas usan para procesar CV. Esta revisión te orienta; no garantiza superar sus filtros." : "An ATS is a system some companies use to process resumes. This review offers guidance; it does not guarantee passing their filters."}</p>
         </div>
