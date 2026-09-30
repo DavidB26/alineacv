@@ -10,7 +10,6 @@ import { extractPdfOperatorItems, extractPdfPageText } from "./pdf-text-extracti
 import { repairWrappedResumeLines } from "./resume-improvements.mjs";
 
 type Language = "es" | "en";
-type TargetMode = "vacancy" | "role";
 type Status = "idle" | "reading" | "analyzing" | "ready" | "error";
 const dictionary = {
   es: {
@@ -19,7 +18,7 @@ const dictionary = {
     analyzerNav: "Analizar CV",
     eyebrow: "Analizador ATS gratuito",
     title: "Acerca tu CV al puesto que buscas.",
-    intro: "Sube tu CV y añade la convocatoria o el puesto. Descubre qué mejorar antes de postular.",
+    intro: "Sube tu CV y añade la oferta. Recibe una versión adaptada y lista para postular.",
     badges: ["PDF y Word", "Análisis en tu dispositivo", "Sin registro"],
     landingLead: "Sube tu CV y pega la descripción de la vacante. Revisaremos sus coincidencias y la calidad del documento, criterio por criterio.",
     landingPrivacy: "Tu PDF nunca sale de este dispositivo durante el análisis local.",
@@ -42,6 +41,9 @@ const dictionary = {
     vacancyLabel: "Descripción de la vacante (obligatoria)",
     vacancyHelp: "Pega la descripción completa, incluyendo funciones y requisitos. Necesitamos una vacante para comparar tu CV.",
     vacancyPlaceholder: "Ej. Buscamos analista de datos con experiencia en SQL, Power BI, Python…",
+    vacancyUrlLabel: "Enlace de la oferta (opcional)",
+    vacancyUrlHelp: "Lo conservamos como referencia de esta postulación. Pega también la descripción para realizar el análisis local.",
+    vacancyUrlPlaceholder: "https://empresa.com/empleos/vacante",
     vacancyReady: "Vacante añadida: ya podemos comparar sus palabras clave con tu CV.",
     analyze: "Analizar mi CV",
     analyzeAndAdapt: "Analizar CV y oferta",
@@ -99,7 +101,7 @@ const dictionary = {
     analyzerNav: "Check resume",
     eyebrow: "Free ATS resume checker",
     title: "Bring your resume closer to your next role.",
-    intro: "Upload your resume and add a job description or role. Find out what to improve before applying.",
+    intro: "Upload your resume and add the job description. Get a tailored version ready to apply.",
     badges: ["PDF and Word", "On-device analysis", "No account"],
     landingLead: "Upload your resume and paste the job description. We will review keyword matches and document quality, check by check.",
     landingPrivacy: "Your PDF never leaves this device during the local analysis.",
@@ -122,6 +124,9 @@ const dictionary = {
     vacancyLabel: "Job description (required)",
     vacancyHelp: "Paste the full description, including duties and requirements. A job description is needed to compare your resume.",
     vacancyPlaceholder: "e.g. We are looking for a data analyst with SQL, Power BI and Python experience…",
+    vacancyUrlLabel: "Job link (optional)",
+    vacancyUrlHelp: "We keep it as a reference for this application. Paste the description as well to run the analysis locally.",
+    vacancyUrlPlaceholder: "https://company.com/jobs/opening",
     vacancyReady: "Job description added: we can now compare its keywords with your resume.",
     analyze: "Analyze my resume",
     analyzeAndAdapt: "Analyze resume and job",
@@ -228,10 +233,9 @@ export default function AtsAnalyzer() {
   const [status, setStatus] = useState<Status>("idle");
   const [resumeText, setResumeText] = useState("");
   const [jobDescription, setJobDescription] = useState("");
-  const [targetMode, setTargetMode] = useState<TargetMode>("vacancy");
-  const [targetRole, setTargetRole] = useState("");
+  const [jobUrl, setJobUrl] = useState("");
   const readVersion = useRef(0);
-  const targetText = targetMode === "vacancy" ? jobDescription : targetRole;
+  const targetText = jobDescription;
   const [result, setResult] = useState<ReturnType<typeof analyzeResume> | null>(null);
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
@@ -294,7 +298,7 @@ export default function AtsAnalyzer() {
     setStatus("analyzing");
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     if (version !== readVersion.current) return;
-    const nextResult = analyzeResume(resumeText, targetText, language, targetMode);
+    const nextResult = analyzeResume(resumeText, targetText, language, "vacancy");
     setResult(nextResult);
     setStatus("ready");
   }
@@ -316,15 +320,15 @@ export default function AtsAnalyzer() {
   function changeLanguage(nextLanguage: Language) {
     setLanguage(nextLanguage);
     if (resumeText && result) {
-      setResult(analyzeResume(resumeText, targetText, nextLanguage, targetMode));
+      setResult(analyzeResume(resumeText, targetText, nextLanguage, "vacancy"));
     }
   }
 
   const wordCount = resumeText ? resumeText.split(/\s+/).filter(Boolean).length : 0;
   const es = language === "es";
   const hasTarget = targetText.trim().length > 0;
-  const targetLabel = targetMode === "role" ? targetRole.trim() : vacancyLabel(jobDescription, language);
-  const versionName = adaptedVersionName(targetLabel, targetMode === "vacancy" ? vacancyCompany(jobDescription) : "", language);
+  const targetLabel = vacancyLabel(jobDescription, language);
+  const versionName = adaptedVersionName(targetLabel, vacancyCompany(jobDescription), language);
 
   useEffect(() => {
     if (!result) return;
@@ -356,8 +360,8 @@ export default function AtsAnalyzer() {
           <p className="ats-focus-lead">{copy.intro}</p>
           <ul className="ats-focus-benefits">
             <li><span>01</span><div><strong>{es ? "Qué coincide con la oferta" : "What matches the job"}</strong><p>{es ? "Palabras clave presentes y requisitos que conviene revisar." : "Keywords already present and requirements to review."}</p></div></li>
-            <li><span>02</span><div><strong>{es ? "Proyectos para cubrir brechas" : "Projects to close gaps"}</strong><p>{es ? "Generamos proyectos según los requisitos de la oferta que todavía no aparecen en tu CV." : "We generate projects for job requirements that are not yet present in your resume."}</p></div></li>
-            <li><span>03</span><div><strong>{es ? "Un CV completo para postular" : "A complete resume ready to apply"}</strong><p>{es ? "Descarga tu CV original, reorganizado para ATS e incluyendo los proyectos adicionales." : "Download your original resume, reorganized for ATS and including the additional projects."}</p></div></li>
+            <li><span>02</span><div><strong>{es ? "Contenido adaptado" : "Tailored content"}</strong><p>{es ? "Priorizamos el perfil, la experiencia y las habilidades relevantes para esa oferta." : "We prioritize the summary, experience and skills relevant to that job."}</p></div></li>
+            <li><span>03</span><div><strong>{es ? "Un CV completo para postular" : "A complete resume ready to apply"}</strong><p>{es ? "Descarga una versión ATS con habilidades demostradas y habilidades en desarrollo claramente separadas." : "Download an ATS version with demonstrated and developing skills clearly separated."}</p></div></li>
           </ul>
           <p className="ats-focus-limits">{es ? "ATS es el sistema que algunas empresas usan para procesar CV. Esta revisión te orienta; no garantiza superar sus filtros." : "An ATS is a system some companies use to process resumes. This review offers guidance; it does not guarantee passing their filters."}</p>
         </div>
@@ -378,20 +382,24 @@ export default function AtsAnalyzer() {
           {error && <p className="ats-focus-error" role="alert">{error}</p>}
           <fieldset className="ats-focus-target" disabled={status === "analyzing"}>
             <legend className="ats-focus-step"><span>2</span>{es ? "Cuéntanos a qué postulas" : "Tell us what you are applying for"}</legend>
-            <div className="ats-target-options">
-              <label><input type="radio" name="target-mode" value="vacancy" checked={targetMode === "vacancy"} onChange={() => setTargetMode("vacancy")} /><span>{es ? "Tengo una convocatoria" : "I have a job description"}</span></label>
-              <label><input type="radio" name="target-mode" value="role" checked={targetMode === "role"} onChange={() => setTargetMode("role")} /><span>{es ? "Solo tengo el puesto" : "I only have a job title"}</span></label>
+            <div className="ats-target-fields">
+              <div>
+                <label className="ats-target-label" htmlFor="ats-target">{es ? "Pega la oferta laboral" : "Paste the job description"}</label>
+                <textarea id="ats-target" required maxLength={18_000} value={jobDescription} onChange={(event) => updateVacancy(event.target.value)} placeholder={copy.vacancyPlaceholder} rows={7} aria-describedby="ats-target-help" />
+                <p id="ats-target-help">{es ? "Incluye funciones, herramientas y requisitos. Cuanto más completa, mejor será la adaptación." : "Include duties, tools and requirements. More detail produces a stronger adaptation."}</p>
+              </div>
+              <div>
+                <label className="ats-target-label" htmlFor="ats-job-url">{copy.vacancyUrlLabel}</label>
+                <input id="ats-job-url" type="url" maxLength={2_000} value={jobUrl} onChange={(event) => setJobUrl(event.target.value)} placeholder={copy.vacancyUrlPlaceholder} aria-describedby="ats-job-url-help" />
+                <p id="ats-job-url-help">{copy.vacancyUrlHelp}</p>
+              </div>
             </div>
-            <label className="ats-target-label" htmlFor="ats-target">{targetMode === "vacancy" ? (es ? "Pega la convocatoria" : "Paste the job description") : (es ? "Puesto que buscas" : "Target job title")}</label>
-            {targetMode === "vacancy" ? <textarea id="ats-target" required maxLength={18_000} value={jobDescription} onChange={(event) => updateVacancy(event.target.value)} placeholder={copy.vacancyPlaceholder} rows={6} aria-describedby="ats-target-help" />
-              : <input id="ats-target" required maxLength={160} value={targetRole} onChange={(event) => setTargetRole(event.target.value)} placeholder={es ? "Ej. Analista de datos junior" : "e.g. Junior data analyst"} aria-describedby="ats-target-help" />}
-            <p id="ats-target-help">{targetMode === "vacancy" ? (es ? "Incluye funciones, herramientas y requisitos. Cuanto más completa, mejor la comparación." : "Include duties, tools and requirements. More detail makes the comparison more useful.") : (es ? "Te orientamos sobre el contenido y la estructura. Sin una oferta no calculamos un porcentaje de coincidencia." : "Get guidance on content and structure. Without a job description, we do not calculate a match percentage.")}</p>
           </fieldset>
           <button type="submit" className="ats-focus-submit" disabled={status !== "ready" || !hasTarget}>{status === "analyzing" ? copy.analyzing : copy.analyze}<span aria-hidden="true">→</span></button>
           <p className="ats-focus-private">{es ? "Sin registro. Tu CV y el texto se analizan en este dispositivo." : "No account needed. Your resume and text are analyzed on this device."}</p>
         </form>
       </section> : <section className="ats-workspace has-report" aria-label={es ? "Resultado del análisis" : "Analysis results"}>
-        <AtsReport key={language + targetText + targetMode} result={result} resumeText={resumeText} fileName={file?.name || (es ? "CV analizado" : "Analyzed resume")} targetLabel={targetLabel} versionName={versionName} language={language} onReset={reset} onEdit={() => setResult(null)} />
+        <AtsReport key={language + targetText} result={result} resumeText={resumeText} fileName={file?.name || (es ? "CV analizado" : "Analyzed resume")} targetLabel={targetLabel} versionName={versionName} language={language} onReset={reset} onEdit={() => setResult(null)} />
       </section>}
       <footer className="ats-focus-footer"><span>AlineaCV</span><p>{es ? "Mejora cómo presentas tu experiencia. Conserva lo que te hace único." : "Improve how you present your experience. Keep what makes you unique."}</p></footer>
     </main>

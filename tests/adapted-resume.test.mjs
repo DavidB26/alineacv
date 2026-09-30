@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { analyzeResume } from "../app/analizar-cv/analysis.mjs";
 import {
+  adaptedSkillPlan,
   adaptedVersionName,
   appendConfirmedEvidence,
   automaticProjectSuggestions,
@@ -81,7 +82,7 @@ test("generates offer-specific projects and includes them in the complete adapte
   assert.equal(result.score, originalScore);
   assert.match(document.plainText, /Andrea Salazar/);
   assert.match(document.plainText, /Revisar contratos y preparé expedientes/);
-  assert.match(document.plainText, /PROYECTOS INDEPENDIENTES/);
+  assert.match(document.plainText, /PROYECTOS RELEVANTES/);
   for (const project of projects) assert.match(document.plainText, new RegExp(project.title, "i"));
 });
 
@@ -175,8 +176,43 @@ Herramientas de desarrollo asistidas por IA como GitHub Copilot, ChatGPT o Claud
   const complete = appendConfirmedEvidence(source, projects, "es");
   const document = buildAdaptedResume(complete, result, "Vacante analizada", "es");
   const skills = document.sections.find((section) => section.kind === "skills");
-  assert.deepEqual(skills.blocks.map((block) => block.label), ["Frontend", "Backend y datos", "Herramientas"]);
+  assert.deepEqual(skills.blocks.map((block) => block.label), ["Frontend", "Backend y datos", "Herramientas", "Alineadas con la oferta"]);
   assert.doesNotMatch(document.plainText, /Herramientas: Frontend:/);
+});
+
+test("adapts a resume to full technical coverage without inventing projects or eligibility", () => {
+  const source = `David Beslanga
+51 999 111 222 | david@example.com | Lima, Perú
+Desarrollador frontend con 8 años de experiencia
+PERFIL PROFESIONAL
+Especialista en interfaces web y optimización de rendimiento.
+EXPERIENCIA PROFESIONAL
+Frontend Developer · Empresa Real · 2020 — Presente
+• Coordinar entregas con el equipo de producto.
+• Implementar componentes reutilizables con React y TypeScript.
+HABILIDADES
+React | TypeScript | Git | Comunicación | Trabajo en equipo
+FORMACIÓN ACADÉMICA
+Bachiller en Ingeniería de Sistemas
+IDIOMAS
+Inglés intermedio`;
+  const vacancy = `Inglés C1 avanzado. React o Angular, TypeScript, API REST, Git, testing, code review, comunicación y trabajo en equipo.`;
+  const result = analyzeResume(source, vacancy, "es");
+  const plan = adaptedSkillPlan(result);
+  const document = buildAdaptedResume(source, result, "Frontend Developer", "es");
+
+  assert.deepEqual(new Set(plan.supportedTechnical), new Set(["TypeScript", "Git", "React o Angular"]));
+  assert.deepEqual(plan.supportedSoft, ["Comunicación", "Trabajo en equipo"]);
+  assert.ok(plan.developingTechnical.includes("API REST"));
+  assert.ok(plan.developingTechnical.includes("Testing"));
+  assert.ok(plan.developingTechnical.includes("Code review"));
+  assert.ok(![...plan.supportedTechnical, ...plan.developingTechnical].includes("Inglés C1"));
+  assert.doesNotMatch(document.plainText, /PROYECTOS (?:INDEPENDIENTES|RELEVANTES)/);
+  assert.match(document.plainText, /HABILIDADES EN DESARROLLO/);
+  assert.match(document.plainText, /Habilidades técnicas en desarrollo: [^\n]*Testing[^\n]*Code review[^\n]*API REST/);
+  assert.match(document.plainText, /Frontend Developer · Empresa Real/);
+  assert.match(document.plainText, /• Implementar componentes reutilizables con React y TypeScript\.[\s\S]*• Coordinar entregas/);
+  assert.match(document.plainText, /Experiencia demostrada en/);
 });
 
 test("turns Azure and SOLID into one complete demonstrable project and exports only its concise version", () => {

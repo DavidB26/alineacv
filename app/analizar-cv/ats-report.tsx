@@ -6,7 +6,7 @@ import ResumeImprovementPlan from "./resume-improvement-plan";
 const dictionary = {
   es: {
     score: "Coincidencia actual del CV",
-    estimate: "Calculada solo con el CV que subiste; los proyectos sugeridos no inflan este porcentaje.",
+    estimate: "Calculada solo con la información respaldada que ya aparece en el CV que subiste.",
     unavailable: "Sin puntaje calculable",
     unavailableHelp: "No identificamos requisitos concretos. Pega una descripción más completa.",
     technical: "Ver detalle técnico ATS",
@@ -28,7 +28,7 @@ const dictionary = {
   },
   en: {
     score: "Current resume match",
-    estimate: "Calculated only from the resume you uploaded; suggested projects do not inflate this percentage.",
+    estimate: "Calculated only from supported information already present in the resume you uploaded.",
     unavailable: "No measurable score",
     unavailableHelp: "No concrete requirements were identified. Paste a fuller description.",
     technical: "View technical ATS details",
@@ -148,7 +148,7 @@ export default function AtsReport({ result, resumeText, fileName, targetLabel, v
       </details>
 
       <div className="ats-report-footer">
-        <button type="button" onClick={onEdit}>{es ? "Cambiar convocatoria o puesto" : "Change job description or role"}</button>
+        <button type="button" onClick={onEdit}>{es ? "Cambiar oferta" : "Change job description"}</button>
         <button type="button" onClick={onReset}>{copy.another}</button>
       </div>
     </div>

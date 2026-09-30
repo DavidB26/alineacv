@@ -9,7 +9,7 @@ import "./globals.css";
 import { getSiteOrigin } from "./site-url";
 
 const title = "Analizador de CV ATS gratis | AlineaCV";
-const description = "Sube tu CV y compáralo con una convocatoria o indica el puesto que buscas. Recibe recomendaciones concretas y un CV reorganizado. Análisis local y privado.";
+const description = "Sube tu CV y compáralo con una oferta laboral. Recibe una versión ATS adaptada con la experiencia y habilidades relevantes. Análisis local y privado.";
 
 export const viewport: Viewport = {
   colorScheme: "light",

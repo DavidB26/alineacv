@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { analyzeResume } from "./analysis.mjs";
-import { appendConfirmedEvidence, automaticProjectSuggestions, buildAdaptedResume } from "./adapted-resume.mjs";
+import { adaptedSkillPlan, buildAdaptedResume } from "./adapted-resume.mjs";
 
 type Language = "es" | "en";
 type ResumeBlock =
@@ -51,18 +51,15 @@ export default function ResumeImprovementPlan({ result, originalResumeText, file
   language: Language;
 }) {
   const es = language === "es";
-  const projects = useMemo(() =>
-    automaticProjectSuggestions(result, targetLabel, originalResumeText, language),
-  [result, targetLabel, originalResumeText, language]);
-  const completeResumeText = useMemo(() =>
-    appendConfirmedEvidence(originalResumeText, projects, language),
-  [originalResumeText, projects, language]);
+  const skills = useMemo(() => adaptedSkillPlan(result), [result]);
   const adaptedResume = useMemo<AdaptedDocument>(() =>
-    buildAdaptedResume(completeResumeText, result, targetLabel, language, { fileName }),
-  [completeResumeText, result, targetLabel, language, fileName]);
+    buildAdaptedResume(originalResumeText, result, targetLabel, language, { fileName }),
+  [originalResumeText, result, targetLabel, language, fileName]);
   const [printing, setPrinting] = useState(false);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle");
   const eligibility = result.eligibilityChecks ?? [];
+  const hasTechnicalRequirements = Boolean(skills.supportedTechnical.length + skills.supportedSoft.length + skills.developingTechnical.length + skills.developingSoft.length);
+  const adaptedCoverage = hasTechnicalRequirements ? 100 : null;
 
   useEffect(() => {
     if (!printing) return;
@@ -89,17 +86,32 @@ export default function ResumeImprovementPlan({ result, originalResumeText, file
     }
   }
 
-  return <section className="resume-improvement-plan automatic-resume-plan" aria-labelledby="improvement-plan-title">
-    <h2 id="improvement-plan-title">{es ? "Proyecto independiente para esta oferta" : "Independent project for this role"}</h2>
-    <p className="automatic-resume-intro">{projects.length
-      ? (es
-        ? `Tu CV actual tiene ${result.score ?? "—"}% de coincidencia. Te proponemos un proyecto demostrable según los requisitos faltantes. En el CV solo aparecerá la versión breve; aquí tienes el alcance completo para desarrollarlo y enseñarlo.`
-        : `Your current resume has a ${result.score ?? "—"}% match. We propose a demonstrable project based on the missing requirements. Only the concise version will appear in the resume; the full scope stays here so you can build and present it.`)
-      : (es ? "No detectamos una brecha técnica que deba convertirse en proyecto. Revisa igualmente los requisitos personales de la oferta." : "We did not detect a technical gap that should become a project. Review the job's personal requirements as well.")}</p>
+  return <section className="resume-improvement-plan adapted-resume-plan" aria-labelledby="improvement-plan-title">
+    <h2 id="improvement-plan-title">{es ? "Tu CV adaptado está listo" : "Your tailored resume is ready"}</h2>
+    <p className="automatic-resume-intro">{es
+      ? "Priorizamos la experiencia más relevante, ajustamos el perfil y organizamos las habilidades con el lenguaje de la oferta. No añadimos empleos ni responsabilidades inexistentes."
+      : "We prioritized the most relevant experience, tailored the summary and organized skills using the job's language. We did not add nonexistent jobs or responsibilities."}</p>
+
+    <div className="adapted-score-grid" aria-label={es ? "Comparación de cobertura" : "Coverage comparison"}>
+      <section><span>{es ? "Coincidencia respaldada" : "Supported match"}</span><strong>{result.score ?? "—"}{result.score !== null ? "%" : ""}</strong><p>{es ? "Basada en información ya presente en tu CV." : "Based on information already present in your resume."}</p></section>
+      <section><span>{es ? "Cobertura técnica adaptada" : "Tailored technical coverage"}</span><strong>{adaptedCoverage ?? "—"}{adaptedCoverage !== null ? "%" : ""}</strong><p>{es ? "Incluye los términos faltantes como habilidades en desarrollo." : "Includes missing terms as skills in development."}</p></section>
+    </div>
+    <p className="adapted-score-note">{es ? "La cobertura técnica indica que los términos fueron ubicados en el CV; no acredita dominio ni garantiza una entrevista." : "Technical coverage means the terms were placed in the resume; it does not prove proficiency or guarantee an interview."}</p>
+
+    <section className="adapted-changes" aria-labelledby="adapted-changes-title">
+      <h3 id="adapted-changes-title">{es ? "Qué adaptamos" : "What we tailored"}</h3>
+      <ul>
+        <li><strong>{es ? "Perfil y experiencia" : "Summary and experience"}</strong><span>{es ? "Priorizados según las coincidencias reales con la oferta." : "Prioritized using real matches with the job."}</span></li>
+        {skills.supportedTechnical.length > 0 && <li><strong>{es ? "Habilidades demostradas" : "Demonstrated skills"}</strong><span>{skills.supportedTechnical.join(" · ")}</span></li>}
+        {skills.supportedSoft.length > 0 && <li><strong>{es ? "Competencias demostradas" : "Demonstrated strengths"}</strong><span>{skills.supportedSoft.join(" · ")}</span></li>}
+        {skills.developingTechnical.length > 0 && <li><strong>{es ? "Habilidades técnicas en desarrollo" : "Technical skills in development"}</strong><span>{skills.developingTechnical.join(" · ")}</span></li>}
+        {skills.developingSoft.length > 0 && <li><strong>{es ? "Competencias en desarrollo" : "Strengths in development"}</strong><span>{skills.developingSoft.join(" · ")}</span></li>}
+      </ul>
+    </section>
 
     {eligibility.length > 0 && <section className="offer-eligibility" aria-labelledby="offer-eligibility-title">
-      <h3 id="offer-eligibility-title">{es ? "Requisitos que un proyecto no reemplaza" : "Requirements a project cannot replace"}</h3>
-      <p>{es ? "Los separamos de las habilidades técnicas para no convertir idiomas, estudios, residencia o años de experiencia en proyectos ficticios." : "We keep these separate from technical skills so languages, education, residence or years of experience do not become fictional projects."}</p>
+      <h3 id="offer-eligibility-title">{es ? "Requisitos personales por revisar" : "Personal requirements to review"}</h3>
+      <p>{es ? "Idiomas, estudios, residencia y años de experiencia se mantienen separados porque no pueden completarse mediante palabras clave." : "Languages, education, residence and years of experience stay separate because keywords cannot complete them."}</p>
       <ul>{eligibility.map((item) => <li key={item.id}>
         <div><strong>{item.label}</strong><span>{item.evidence}</span></div>
         <span className={`offer-eligibility-status ${item.status}`}>
@@ -108,43 +120,11 @@ export default function ResumeImprovementPlan({ result, originalResumeText, file
       </li>)}</ul>
     </section>}
 
-    {projects.length > 0 && <section className="automatic-projects" aria-labelledby="automatic-projects-title">
-      <h3 id="automatic-projects-title">{es ? "Proyecto completo recomendado" : "Recommended complete project"}</h3>
-      <div>
-        {projects.map((project, index) => <article className="automatic-project-card" key={project.id}>
-          <span className="automatic-project-number">{es ? `${project.projectType} ${index + 1}` : `${project.projectType} ${index + 1}`}</span>
-          <h4>{project.title}</h4>
-          <p className="automatic-project-summary">{project.summary}</p>
-          <div className="automatic-project-plan">
-            <section>
-              <h5>{es ? "Qué debe incluir" : "What it should include"}</h5>
-              <ul>{project.scope.map((item) => <li key={item}>{item}</li>)}</ul>
-            </section>
-            <section>
-              <h5>{es ? "Qué debes poder enseñar" : "What you should be able to show"}</h5>
-              <ul>{project.deliverables.map((item) => <li key={item}>{item}</li>)}</ul>
-            </section>
-          </div>
-          <strong className="automatic-project-keyword-label">{es ? "Requisitos que aborda" : "Requirements addressed"}</strong>
-          <ul className="automatic-project-keywords" aria-label={es ? "Requisitos que aborda" : "Requirements addressed"}>
-            {project.keywords.map((keyword) => <li key={keyword}>{keyword}</li>)}
-          </ul>
-          <section className="automatic-project-cv-preview" aria-label={es ? "Versión breve para el CV" : "Concise resume version"}>
-            <span>{es ? "Versión breve que irá al CV" : "Concise version for the resume"}</span>
-            <h5>{project.title} — {project.projectType}</h5>
-            <ul className="automatic-project-steps">
-              {(project.bullets ?? [project.text]).map((step) => <li key={step}>{step}</li>)}
-            </ul>
-          </section>
-        </article>)}
-      </div>
-    </section>}
-
-    <div className="resume-export-actions" aria-label={es ? "Descargar CV adaptado" : "Download adapted resume"}>
-      <button className="primary" type="button" onClick={() => setPrinting(true)} disabled={printing}>{es ? "Descargar CV completo en PDF" : "Download complete resume as PDF"} <span aria-hidden="true">↓</span></button>
-      <button type="button" onClick={() => void copyResume()}>{copyStatus === "copied" ? (es ? "Copiado ✓" : "Copied ✓") : (es ? "Copiar CV completo" : "Copy complete resume")}</button>
+    <div className="resume-export-actions" aria-label={es ? "Descargar CV adaptado" : "Download tailored resume"}>
+      <button className="primary" type="button" onClick={() => setPrinting(true)} disabled={printing}>{es ? "Descargar CV adaptado en PDF" : "Download tailored resume as PDF"} <span aria-hidden="true">↓</span></button>
+      <button type="button" onClick={() => void copyResume()}>{copyStatus === "copied" ? (es ? "Copiado ✓" : "Copied ✓") : (es ? "Copiar CV adaptado" : "Copy tailored resume")}</button>
     </div>
-    <p className="resume-export-note">{es ? "La descarga conserva tu experiencia original y añade únicamente la versión breve del proyecto independiente." : "The download keeps your original experience and adds only the concise independent-project version."}</p>
+    <p className="resume-export-note">{es ? "La descarga conserva tus empresas, cargos y experiencia original; reorganiza el contenido y distingue las habilidades en desarrollo." : "The download keeps your original employers, roles and experience; it reorganizes the content and distinguishes skills in development."}</p>
     {copyStatus === "error" && <p className="resume-copy-status" role="status">{es ? "No se pudo copiar. Puedes descargar el PDF." : "Could not copy. You can download the PDF."}</p>}
     {printing && createPortal(<ReferenceResumeDocument resume={adaptedResume} language={language} />, document.body)}
   </section>;
