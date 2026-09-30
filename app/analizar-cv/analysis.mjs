@@ -15,7 +15,11 @@ const REQUIREMENT_GROUPS = [
   ["TypeScript", ["typescript"]],
   ["React", ["react", "reactjs", "react.js"]],
   ["Angular", ["angular", "angularjs"]],
+  ["Vue 2", ["vue 2", "vue2"]],
+  ["Vue 3", ["vue 3", "vue3"]],
   ["Vue.js", ["vue", "vuejs", "vue.js"]],
+  ["Vuex", ["vuex"]],
+  ["Pinia", ["pinia"]],
   ["Next.js", ["next.js", "nextjs"]],
   ["Node.js", ["node.js", "nodejs"]],
   ["HTML", ["html", "html5"]],
@@ -50,6 +54,7 @@ const REQUIREMENT_GROUPS = [
   ["Kubernetes", ["kubernetes", "k8s"]],
   ["Git", ["git"]],
   ["GitHub", ["github"]],
+  ["Sourcetree", ["sourcetree"]],
   ["CI/CD", ["ci/cd", "ci", "cd", "continuous integration", "continuous delivery"]],
   ["API", ["api", "apis"]],
   ["REST", ["rest", "restful"]],
@@ -228,6 +233,32 @@ const SPANISH_NUMBER_WORD = String.raw`(?:
   cien|ciento
 )`.replace(/\s+/g, "");
 const NUMBER_VALUE = `(?:${DIGIT_NUMBER}|${SPANISH_NUMBER_WORD})`;
+const SPANISH_NUMBER_VALUES = new Map([
+  ["cero", 0], ["un", 1], ["uno", 1], ["una", 1], ["dos", 2], ["tres", 3], ["cuatro", 4],
+  ["cinco", 5], ["seis", 6], ["siete", 7], ["ocho", 8], ["nueve", 9], ["diez", 10],
+  ["once", 11], ["doce", 12], ["trece", 13], ["catorce", 14], ["quince", 15],
+  ["dieciseis", 16], ["diecisiete", 17], ["dieciocho", 18], ["diecinueve", 19], ["veinte", 20],
+  ["veintiuno", 21], ["veintiuna", 21], ["veintidos", 22], ["veintitres", 23], ["veinticuatro", 24],
+  ["veinticinco", 25], ["veintiseis", 26], ["veintisiete", 27], ["veintiocho", 28], ["veintinueve", 29],
+  ["treinta", 30], ["cuarenta", 40], ["cincuenta", 50], ["sesenta", 60], ["setenta", 70],
+  ["ochenta", 80], ["noventa", 90], ["cien", 100], ["ciento", 100],
+]);
+
+function numericValue(value) {
+  const plain = normalize(value).trim();
+  if (/^\d/.test(plain)) return Number(plain.replace(",", "."));
+  if (SPANISH_NUMBER_VALUES.has(plain)) return SPANISH_NUMBER_VALUES.get(plain);
+  const compound = plain.match(/^(treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|noventa)\s+y\s+(un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve)$/);
+  return compound ? SPANISH_NUMBER_VALUES.get(compound[1]) + SPANISH_NUMBER_VALUES.get(compound[2]) : Number.NaN;
+}
+
+function statedExperienceYears(text) {
+  const patterns = [
+    new RegExp(String.raw`(?:\+|mas de|al menos|minim[oa](?: de)?|minimum of|at least)?\s*(${NUMBER_VALUE})\s+(?:anos?|years?)(?:\s+de)?\s+experiencia`, "g"),
+    new RegExp(String.raw`\bexperiencia(?:\s+minima)?(?:\s+de|\s+de al menos|\s+de mas de|\s+minimum of|\s+at least)?\s+(${NUMBER_VALUE})\s+(?:anos?|years?)`, "g"),
+  ];
+  return patterns.flatMap((pattern) => [...text.matchAll(pattern)].map((match) => numericValue(match[1]))).filter(Number.isFinite);
+}
 const MEASURABLE_UNIT = String.raw`(?:
   por\s+ciento|percent|mil|k|millon(?:es)?|million(?:s)?|
   segundos?|seconds?|minutos?|minutes?|horas?|hours?|dias?|days?|semanas?|weeks?|meses?|months?|
@@ -365,6 +396,7 @@ function keywordList(value) {
   requirements = requirements.filter((requirement) => {
     if (requirement.label === "Investigación" && (labels.has("Investigación de usuarios") || labels.has("Investigación jurídica"))) return false;
     if (requirement.label === "Marketing" && (labels.has("Marketing de contenidos") || labels.has("Email marketing"))) return false;
+    if (requirement.label === "Vue.js" && (labels.has("Vue 2") || labels.has("Vue 3"))) return false;
     return true;
   });
 
@@ -418,12 +450,9 @@ function eligibilityChecks(jobDescription, resumeText, language) {
     });
   }
 
-  const yearsMatch = job.match(/(?:\+|mas de|al menos|minimum of|at least)?\s*(\d{1,2})\s+(?:anos?|years?)(?:\s+de)?\s+experiencia/);
-  if (yearsMatch) {
-    const requiredYears = Number(yearsMatch[1]);
-    const declaredYears = [...resume.matchAll(/(?:mas de\s+)?(\d{1,2})\s+(?:anos?|years?)(?:\s+de)?\s+experiencia/g)]
-      .map((match) => Number(match[1]))
-      .sort((a, b) => b - a)[0];
+  const requiredYears = statedExperienceYears(job).sort((a, b) => b - a)[0];
+  if (Number.isFinite(requiredYears)) {
+    const declaredYears = statedExperienceYears(resume).sort((a, b) => b - a)[0];
     checks.push({
       id: "eligibility-experience",
       label: localized(language, `${requiredYears}+ años de experiencia`, `${requiredYears}+ years of experience`),

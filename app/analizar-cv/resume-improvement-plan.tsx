@@ -135,8 +135,8 @@ export default function ResumeImprovementPlan({ result, originalResumeText, jobD
         <span>{confirmedProposals.length}/{proposals.length} {es ? "confirmados" : "confirmed"}</span>
       </header>
       <p className="aggressive-adaptation-help">{es
-        ? "Los redactamos a partir de la oferta y los ubicamos en el puesto más relacionado. Confirma únicamente lo que realmente hiciste; solo entonces se incorporará al CV descargable."
-        : "We drafted these from the job description and placed them under the closest role. Confirm only work you actually performed; only confirmed content is added to the downloadable resume."}</p>
+        ? "Los redactamos a partir de la oferta y los distribuimos entre los puestos compatibles de tu experiencia. Confirma únicamente lo que realmente hiciste; solo entonces se incorporará al CV descargable."
+        : "We drafted these from the job description and distributed them across compatible roles in your experience. Confirm only work you actually performed; only confirmed content is added to the downloadable resume."}</p>
       <div className="aggressive-proposal-list">
         {proposals.map((proposal) => {
           const state = proposalStates[proposal.id] ?? "pending";

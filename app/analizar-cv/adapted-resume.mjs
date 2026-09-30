@@ -714,38 +714,187 @@ function experienceEntries(sourceText, language) {
   return recovered?.entries?.length ? recovered.entries : entryBlocks(lines, language);
 }
 
-function chooseSuggestionRole(entries, domain) {
+function rankedSuggestionRoles(entries, domain) {
   const signal = EXPERIENCE_ROLE_SIGNALS[domain] ?? EXPERIENCE_ROLE_SIGNALS.general;
-  return entries
+  const ranked = entries
     .map((entry, index) => ({
       entry,
       index,
-      score: signal.test(normalize([entry.title, ...(entry.meta ?? [])].join(" "))) ? 10 : 0,
+      score: signal.test(normalize([entry.title, ...(entry.meta ?? [])].join(" ")))
+        ? 20
+        : signal.test(normalize([entry.title, ...(entry.meta ?? []), ...(entry.bullets ?? [])].join(" ")))
+          ? 10
+          : 0,
     }))
-    .sort((left, right) => right.score - left.score || left.index - right.index)[0]?.entry;
+    .sort((left, right) => right.score - left.score || left.index - right.index);
+  const compatible = ranked.filter(({ score }) => score > 0).map(({ entry }) => entry);
+  return compatible.length ? compatible : ranked.slice(0, 1).map(({ entry }) => entry);
+}
+
+function experienceSuggestionBullets(project, language) {
+  const keywords = project.coveredKeywords ?? [];
+  if (project.domain === "software") {
+    const frontend = keywords.filter((keyword) => /^(?:vue(?:\.?js|\s*[23])?|vuex|pinia|angular|react|typescript|javascript|html5?|css3?)$/i.test(normalize(keyword)));
+    const backend = keywords.filter((keyword) => /^(?:java|python|php|node(?:\.js)?|c#|\.net|spring|laravel|api|rest|api rest)$/i.test(normalize(keyword)));
+    const data = keywords.filter((keyword) => /^(?:sql|mysql|postgresql|sql server|mongodb|firebase|base de datos|database)$/i.test(normalize(keyword)));
+    const cloud = keywords.filter((keyword) => /^(?:aws|azure|google cloud|docker|kubernetes|ci\/cd)$/i.test(normalize(keyword)));
+    const testing = keywords.filter((keyword) => /^(?:testing|qa|selenium|cypress|playwright|jest)$/i.test(normalize(keyword)));
+    const sourceControl = keywords.filter((keyword) => /^(?:git|github|gitlab|bitbucket|sourcetree|code review)$/i.test(normalize(keyword)));
+    const bullets = [];
+    if (frontend.length) {
+      const frameworks = frontend.filter((keyword) => /^(?:vue(?:\.?js|\s*[23])?|angular|react)$/i.test(normalize(keyword)));
+      const state = frontend.filter((keyword) => /^(?:vuex|pinia)$/i.test(normalize(keyword)));
+      const languages = frontend.filter((keyword) => /^(?:typescript|javascript|html5?|css3?)$/i.test(normalize(keyword)));
+      const stack = [...frameworks, ...languages];
+      if (stack.length) bullets.push(language === "es"
+        ? "Desarrollar componentes e interfaces reutilizables con " + joinedKeywords(stack, "es") + "."
+        : "Develop reusable components and interfaces with " + joinedKeywords(stack, "en") + ".");
+      if (state.length) bullets.push(language === "es"
+        ? "Gestionar el estado y los flujos de datos de la interfaz con " + joinedKeywords(state, "es") + "."
+        : "Manage interface state and data flows with " + joinedKeywords(state, "en") + ".");
+    }
+    if (backend.length || data.length) bullets.push(language === "es"
+      ? "Desarrollar servicios y flujos de datos" + (backend.length ? " con " + joinedKeywords(backend, "es") : "") + (data.length ? ", gestionando la persistencia en " + joinedKeywords(data, "es") : "") + "."
+      : "Develop services and data flows" + (backend.length ? " with " + joinedKeywords(backend, "en") : "") + (data.length ? ", managing persistence in " + joinedKeywords(data, "en") : "") + ".");
+    if (cloud.length) bullets.push(language === "es"
+      ? "Desplegar y mantener aplicaciones y servicios en " + joinedKeywords(cloud, "es") + ", configurando entornos reproducibles y controles operativos."
+      : "Deploy and maintain applications and services with " + joinedKeywords(cloud, "en") + ", configuring reproducible environments and operational controls.");
+    if (testing.length) bullets.push(language === "es"
+      ? "Automatizar pruebas funcionales y de regresión con " + joinedKeywords(testing, "es") + " para validar los flujos principales."
+      : "Automate functional and regression tests with " + joinedKeywords(testing, "en") + " to validate core flows.");
+    if (sourceControl.length) bullets.push(language === "es"
+      ? "Gestionar ramas, cambios y revisiones de código con " + joinedKeywords(sourceControl, "es") + " durante el desarrollo y mantenimiento de funcionalidades."
+      : "Manage branches, changes and code reviews with " + joinedKeywords(sourceControl, "en") + " while developing and maintaining features.");
+    if (bullets.length) return bullets;
+  }
+
+  const terms = joinedKeywords(keywords, language);
+  if (terms) {
+    const spanish = {
+      design: "Diseñar piezas, interfaces y entregables visuales con " + terms + ", adaptándolos a los objetivos y formatos de cada proyecto.",
+      legal: "Analizar contratos, expedientes y riesgos relacionados con " + terms + ", preparando informes y documentación de sustento.",
+      architecture: "Desarrollar planos, modelos y documentación técnica con " + terms + ", verificando los criterios funcionales y constructivos del proyecto.",
+      health: "Elaborar protocolos, materiales y registros de seguimiento relacionados con " + terms + ", respetando criterios de seguridad y confidencialidad.",
+      marketing: "Planificar y ejecutar campañas y contenidos con " + terms + ", alineando mensajes, canales y criterios de medición.",
+      finance: "Preparar presupuestos, controles y análisis financieros con " + terms + ", revisando escenarios y desviaciones para la toma de decisiones.",
+      operations: "Optimizar procesos, controles e indicadores mediante " + terms + ", coordinando su seguimiento con las áreas involucradas.",
+      general: "Desarrollar entregables y soluciones profesionales con " + terms + ", de acuerdo con los objetivos y criterios de cada encargo.",
+    };
+    const english = {
+      design: "Design visual assets, interfaces and deliverables with " + terms + ", adapting them to each project's goals and formats.",
+      legal: "Analyze contracts, files and risks related to " + terms + ", preparing reports and supporting documentation.",
+      architecture: "Develop drawings, models and technical documentation with " + terms + ", checking the project's functional and construction criteria.",
+      health: "Prepare protocols, materials and follow-up records related to " + terms + ", following safety and confidentiality criteria.",
+      marketing: "Plan and execute campaigns and content with " + terms + ", aligning messages, channels and measurement criteria.",
+      finance: "Prepare budgets, controls and financial analyses with " + terms + ", reviewing scenarios and variances for decision-making.",
+      operations: "Improve processes, controls and indicators through " + terms + ", coordinating follow-up with the teams involved.",
+      general: "Develop professional deliverables and solutions with " + terms + " according to each engagement's goals and criteria.",
+    };
+    return [(language === "es" ? spanish : english)[project.domain] ?? (language === "es" ? spanish.general : english.general)];
+  }
+
+  const ranked = project.bullets
+    .map((bullet, index) => ({
+      bullet,
+      index,
+      score: keywords.reduce((total, keyword) => total + (normalize(bullet).includes(normalize(keyword)) ? 1 : 0), 0),
+    }))
+    .filter(({ bullet }) => !/^(?:documentar|document)\b/i.test(normalize(bullet)))
+    .sort((left, right) => right.score - left.score || left.index - right.index)
+    .slice(0, 2)
+    .map(({ bullet }) => bullet);
+  return ranked.length ? ranked : project.bullets.slice(0, 1);
+}
+
+function bulletCoversKeyword(bullet, keyword) {
+  const text = normalize(bullet);
+  const term = normalize(keyword);
+  if (text.includes(term)) return true;
+  const aliases = {
+    testing: /\b(?:prueb|test)/,
+    "code review": /(?:revision|revisiones) de codigo|pull request|code review/,
+    "responsive design": /responsive|adaptable/,
+    "arquitectura frontend escalable": /arquitectura frontend|estructura frontend escalable/,
+    "desarrollo asistido por ia": /(?:herramientas|desarrollo) (?:de |asistido por )?(?:ia|inteligencia artificial)/,
+    api: /\bapi\b/,
+    rest: /\brest\b/,
+    "api rest": /\bapi rest\b|\brest api\b/,
+  };
+  return aliases[term]?.test(text) ?? false;
+}
+
+function coveredKeywordsByBullet(bullets, keywords) {
+  const assigned = bullets.map((bullet) => keywords.filter((keyword) => bulletCoversKeyword(bullet, keyword)));
+  const covered = new Set(assigned.flat().map(normalize));
+  const remaining = keywords.filter((keyword) => !covered.has(normalize(keyword)));
+  remaining.forEach((keyword, index) => assigned[index % assigned.length].push(keyword));
+  return assigned;
 }
 
 export function automaticExperienceSuggestions(result, targetLabel, sourceText, language = "es") {
   const roles = experienceEntries(sourceText, language);
   if (!roles.length) return [];
-  return automaticProjectSuggestions(result, targetLabel, sourceText, language).map((project, index) => {
-    const role = chooseSuggestionRole(roles, project.domain);
-    return {
-      id: "experience-suggestion-" + index + "-" + normalize(project.title).replace(/[^a-z0-9]+/g, "-"),
-      roleTitle: role?.title ?? "",
-      roleDate: role?.date ?? "",
-      title: project.title,
-      bullets: project.bullets,
-      coveredKeywords: project.coveredKeywords,
-      domain: project.domain,
-      included: false,
-    };
+  const rolePositions = new Map();
+  return automaticProjectSuggestions(result, targetLabel, sourceText, language).flatMap((project, projectIndex) => {
+    const compatibleRoles = rankedSuggestionRoles(roles, project.domain);
+    const bullets = experienceSuggestionBullets(project, language);
+    const keywordGroups = coveredKeywordsByBullet(bullets, project.coveredKeywords ?? []);
+    return bullets.map((bullet, bulletIndex) => {
+      const position = rolePositions.get(project.domain) ?? 0;
+      const role = compatibleRoles[position % compatibleRoles.length];
+      rolePositions.set(project.domain, position + 1);
+      return {
+        id: "experience-suggestion-" + projectIndex + "-" + bulletIndex + "-" + normalize(project.title).replace(/[^a-z0-9]+/g, "-"),
+        roleTitle: role?.title ?? "",
+        roleDate: role?.date ?? "",
+        title: project.title,
+        bullets: [bullet],
+        coveredKeywords: keywordGroups[bulletIndex],
+        domain: project.domain,
+        included: false,
+      };
+    });
   });
 }
 
 function appendSkillRow(blocks, label, values) {
   if (!values.length) return blocks;
   return [...blocks, { type: "row", label, value: [...new Set(values)].join(" | ") }];
+}
+
+const SKILL_CATEGORIES = [
+  { id: "frontend", terms: /\b(?:frontend|front end|html5?|css3?|javascript|typescript|react|angular|vue(?:\.?js|x)?|pinia|svelte|next\.?js|vite|bootstrap|tailwind|sass|responsive)\b/i, labels: /\b(?:frontend|front end|interfaz|web)\b/i },
+  { id: "backend", terms: /\b(?:backend|back end|php|laravel|python|java|node\.?js|c#|\.net|spring|api|rest|sql|mysql|postgresql|oracle|mongodb|firebase|base de datos|database)\b/i, labels: /\b(?:backend|back end|datos|data|base de datos|database)\b/i },
+  { id: "cms", terms: /\b(?:wordpress|drupal|shopify|woocommerce|contentful|contentstack|cms|ecommerce|comercio electronico)\b/i, labels: /\b(?:cms|ecommerce|comercio electronico)\b/i },
+  { id: "ux", terms: /\b(?:figma|ux|ui|gsap|accesibilidad|accessibility|core web vitals|seo|cro|gtm|datalayer|photoshop|illustrator|indesign|procreate|branding)\b/i, labels: /\b(?:ux|ui|diseno|design|performance|rendimiento)\b/i },
+  { id: "tools", terms: /\b(?:git|github|gitlab|bitbucket|sourcetree|jira|docker|kubernetes|aws|azure|gcp|copilot|chatgpt|claude|ide)\b/i, labels: /\b(?:herramientas|tools|software|tecnologias|technologies)\b/i },
+];
+
+function skillCategory(value, field = "terms") {
+  const plain = normalize(value);
+  return SKILL_CATEGORIES.find((category) => category[field].test(plain))?.id ?? "";
+}
+
+function appendSkillValue(value, keyword) {
+  const items = String(value ?? "").split(/\s*(?:\||,|;)\s*/).map((item) => item.replace(/[.,;]+$/, "").trim()).filter(Boolean);
+  if (items.some((item) => normalize(item) === normalize(keyword))) return value;
+  const separator = String(value).includes("|") ? " | " : ", ";
+  return [...items, keyword].join(separator);
+}
+
+function mergeConfirmedTechnicalSkills(blocks, keywords) {
+  let next = blocks;
+  const unmatched = [];
+  for (const keyword of keywords) {
+    const category = skillCategory(keyword);
+    const rowIndex = category ? next.findIndex((block) => block.type === "row" && skillCategory(block.label, "labels") === category) : -1;
+    if (rowIndex < 0) {
+      unmatched.push(keyword);
+      continue;
+    }
+    next = next.map((block, index) => index === rowIndex ? { ...block, value: appendSkillValue(block.value, keyword) } : block);
+  }
+  return { blocks: next, unmatched };
 }
 
 function prioritizeEntryBlocks(blocks, keywords) {
@@ -771,6 +920,30 @@ function includeConfirmedExperience(blocks, suggestions, language) {
       .map((bullet) => polishResumeBullet(bullet, language));
     return additions.length ? { ...block, bullets: uniqueLines([...block.bullets, ...additions]) } : block;
   });
+}
+
+function experienceDateRank(value) {
+  const date = normalize(value);
+  const present = /\b(?:presente|actualidad|present|current)\b/.test(date);
+  const points = [...date.matchAll(/(?:(\d{2})\/)?((?:19|20)\d{2})/g)]
+    .map((match) => Number(match[2]) * 12 + (Number(match[1]) || 12));
+  if (!points.length) return null;
+  return {
+    end: present ? Number.POSITIVE_INFINITY : points.at(-1),
+    start: points[0],
+  };
+}
+
+function sortExperienceNewestFirst(blocks) {
+  return blocks
+    .map((block, index) => ({ block, index, rank: block.type === "entry" ? experienceDateRank(block.date) : null }))
+    .sort((left, right) => {
+      if (left.rank && right.rank) return right.rank.end - left.rank.end || right.rank.start - left.rank.start || left.index - right.index;
+      if (left.rank) return -1;
+      if (right.rank) return 1;
+      return left.index - right.index;
+    })
+    .map(({ block }) => block);
 }
 
 function documentText(document) {
@@ -831,15 +1004,19 @@ export function buildAdaptedResume(sourceText, result, targetLabel, language = "
     let blocks = recoveredBlocks ?? sectionBlocks(kind, lines, language);
     if ((kind === "experience" || kind === "projects") && recoveredBlocks) blocks = prioritizeEntryBlocks(blocks, [...matched, ...confirmedKeywords]);
     if (kind === "experience") blocks = includeConfirmedExperience(blocks, confirmedSuggestions, language);
+    if (kind === "experience") blocks = sortExperienceNewestFirst(blocks);
     if (kind === "skills") {
       blocks = skillBlocks(lines, language);
-      const relevantTechnical = uniqueLines([...skillPlan.supportedTechnical, ...confirmedKeywords]);
-      blocks = [{
-        type: "row",
-        label: language === "es" ? "Claves para esta oferta" : "Key skills for this role",
-        value: relevantTechnical.join(" | "),
-      }, ...blocks].filter((block) => block.type !== "row" || block.value);
-      blocks = appendSkillRow(blocks, language === "es" ? "Competencias" : "Strengths", skillPlan.supportedSoft);
+      const confirmedTechnical = confirmedKeywords.filter((keyword) => !SOFT_SKILLS.has(keyword));
+      const confirmedSoft = confirmedKeywords.filter((keyword) => SOFT_SKILLS.has(keyword));
+      if (!lines.length) {
+        blocks = appendSkillRow(blocks, language === "es" ? "Habilidades técnicas" : "Technical skills", uniqueLines([...skillPlan.supportedTechnical, ...confirmedTechnical]));
+        blocks = appendSkillRow(blocks, language === "es" ? "Competencias" : "Strengths", uniqueLines([...skillPlan.supportedSoft, ...confirmedSoft]));
+      } else {
+        const merged = mergeConfirmedTechnicalSkills(blocks, confirmedTechnical);
+        blocks = appendSkillRow(merged.blocks, language === "es" ? "Habilidades técnicas" : "Technical skills", merged.unmatched);
+        blocks = appendSkillRow(blocks, language === "es" ? "Competencias confirmadas" : "Confirmed strengths", confirmedSoft);
+      }
     }
     if (kind === "training") {
       blocks = sectionBlocks(kind, lines, language);

@@ -97,6 +97,20 @@ Herramientas de desarrollo asistidas por IA como GitHub Copilot, ChatGPT o Claud
   assert.equal(result.eligibilityChecks.find((item) => item.id === "eligibility-location").status, "matched");
 });
 
+test("compares required experience when years are written as Spanish words or digits", () => {
+  const writtenResume = "Desarrolladora frontend. Tengo siete años de experiencia en desarrollo web.";
+  const numericRequirement = analyzeResume(writtenResume, "Se requieren +2 años de experiencia en desarrollo web.", "es");
+  const matched = numericRequirement.eligibilityChecks.find((item) => item.id === "eligibility-experience");
+  assert.equal(matched.status, "matched");
+  assert.match(matched.evidence, /7 años de experiencia/);
+
+  const numericResume = "Diseñadora gráfica con 3 años de experiencia profesional.";
+  const writtenRequirement = analyzeResume(numericResume, "Experiencia mínima de siete años en diseño gráfico.", "es");
+  const missing = writtenRequirement.eligibilityChecks.find((item) => item.id === "eligibility-experience");
+  assert.equal(missing.status, "missing");
+  assert.match(missing.label, /7\+ años de experiencia/);
+});
+
 test("analyzes a WordPress vacancy as distinct requirements instead of loose words", () => {
   const resume = `David Beslanga
 contact@davidbeslanga.com | Lima, Perú | davidbeslanga.com | github.com/DavidB26

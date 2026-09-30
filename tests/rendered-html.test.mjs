@@ -27,9 +27,10 @@ test("server-renders the ATS landing with both inputs and focused metadata", asy
   const html = await response.text();
   assert.match(html, /<title>Analizador de CV ATS gratis \| AlineaCV<\/title>/i);
   assert.match(html, /Acerca tu CV al puesto que buscas/);
-  assert.match(html, /Pega la oferta laboral/);
-  assert.match(html, /Enlace de la oferta \(opcional\)/);
+  assert.match(html, /Pega la descripción/);
+  assert.match(html, /Usa el enlace de la oferta/);
   assert.match(html, /type="url"/);
+  assert.doesNotMatch(html, /Enlace de la oferta \(opcional\)|Sin registro/);
   assert.doesNotMatch(html, /Solo tengo el puesto/);
   assert.match(html, /type="file"/);
   assert.match(html, /<textarea/);
@@ -40,6 +41,16 @@ test("server-renders the ATS landing with both inputs and focused metadata", asy
   assert.match(html, /rel="canonical" href="http:\/\/localhost(?::3000)?"/);
   assert.match(html, /property="og:image"/);
   assert.doesNotMatch(html, /Harvard Classic|Crear CV|Ver vacantes similares|ats-report-preview|Más de 20 comprobaciones/);
+});
+
+test("rejects private job links before making an external request", async () => {
+  const response = await render("/api/job-description", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ url: "http://127.0.0.1/private-job" }),
+  });
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "invalid_url" });
 });
 
 test("keeps resume data private and supports the complete local workflow", async () => {

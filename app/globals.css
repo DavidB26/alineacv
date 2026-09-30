@@ -857,17 +857,21 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .ats-focus-dropzone strong { font-size: 1rem; }
 .ats-focus-dropzone p { margin: 8px 0 16px; color: #536879; font-size: .875rem; line-height: 1.5; }
 .ats-focus-dropzone button { min-height: 42px; border: 1px solid #bfd1c9; border-radius: 8px; padding: 10px 18px; background: white; color: #1d5741; font-weight: 700; font-size: .875rem; cursor: pointer; }
-.ats-focus-target { min-width: 0; padding: 0; margin: 30px 0 0; border: 0; }
-.ats-target-fields { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(220px, .65fr); gap: 16px; align-items: start; }
+.ats-focus-target { min-width: 0; padding: 0; margin: 38px 0 0; border: 0; }
+.ats-target-fields { display: grid; gap: 18px; }
 .ats-target-fields > div { min-width: 0; }
 .ats-target-label { display: block; margin-bottom: 9px; font-size: .875rem; font-weight: 700; }
 .ats-focus-target textarea, .ats-focus-target input { width: 100%; max-width: 100%; min-height: 48px; padding: 13px; border: 1px solid #cbd7e2; border-radius: 9px; background: #fff; color: var(--ink); font: inherit; font-size: 1rem; line-height: 1.6; }
-.ats-focus-target textarea { resize: vertical; }
+.ats-focus-target textarea { min-height: 190px; resize: vertical; }
 .ats-target-fields p { margin: 9px 0 0; color: #607185; font-size: .8125rem; line-height: 1.55; }
-.ats-focus-submit { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 13px 20px; border: 0; border-radius: 9px; background: var(--panel); color: white; font-size: 1rem; font-weight: 700; cursor: pointer; }
+.ats-target-divider { display: flex; align-items: center; gap: 12px; color: #7a8997; font-size: .8125rem; }
+.ats-target-divider::before, .ats-target-divider::after { content: ""; height: 1px; flex: 1; background: #dbe4e9; }
+.ats-target-url { padding: 18px; border: 1px solid #dce5ea; border-radius: 11px; background: #f8fafb; }
+.ats-target-url input { margin-top: 9px; background: white; }
+.ats-target-error { margin: 14px 0 0; }
+.ats-focus-submit { width: 100%; margin-top: 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 13px 20px; border: 0; border-radius: 9px; background: var(--panel); color: white; font-size: 1rem; font-weight: 700; cursor: pointer; }
 .ats-focus-submit:hover:enabled { background: #194234; }
 .ats-focus-submit:disabled { background: #dce5eb; color: #586b7d; cursor: not-allowed; }
-.ats-focus-private { margin: 14px 0 0; color: #627587; text-align: center; font-size: .875rem; line-height: 1.5; }
 .ats-focus-file { display: flex; gap: 12px; align-items: center; padding: 20px 14px; border: 1px solid #c6ded1; background: #f0faf5; border-radius: 12px; }
 .ats-focus-file-type { color: #24664f; font-weight: 800; font-size: .75rem; }
 .ats-focus-file > div { min-width: 0; flex: 1; }

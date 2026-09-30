@@ -177,7 +177,7 @@ Herramientas de desarrollo asistidas por IA como GitHub Copilot, ChatGPT o Claud
   const complete = appendConfirmedEvidence(source, projects, "es");
   const document = buildAdaptedResume(complete, result, "Vacante analizada", "es");
   const skills = document.sections.find((section) => section.kind === "skills");
-  assert.deepEqual(skills.blocks.map((block) => block.label), ["Claves para esta oferta", "Frontend", "Backend y datos", "Herramientas"]);
+  assert.deepEqual(skills.blocks.map((block) => block.label), ["Frontend", "Backend y datos", "Herramientas"]);
   assert.doesNotMatch(document.plainText, /Herramientas: Frontend:/);
 });
 
@@ -196,10 +196,10 @@ HTML | CSS`;
   const result = analyzeResume(source, vacancy, "es");
   const proposals = automaticExperienceSuggestions(result, "Frontend Developer", source, "es");
 
-  assert.equal(proposals.length, 1);
-  assert.match(proposals[0].roleTitle, /Desarrolladora Frontend - Empresa Uno/);
-  assert.deepEqual(new Set(proposals[0].coveredKeywords), new Set(["Angular", "TypeScript", "Selenium"]));
-  assert.equal(proposals[0].included, false);
+  assert.equal(proposals.length, 2);
+  assert.ok(proposals.every((proposal) => /Desarrolladora Frontend - Empresa Uno/.test(proposal.roleTitle)));
+  assert.deepEqual(new Set(proposals.flatMap((proposal) => proposal.coveredKeywords)), new Set(["Angular", "TypeScript", "Selenium"]));
+  assert.ok(proposals.every((proposal) => proposal.included === false));
 
   const unconfirmed = buildAdaptedResume(source, result, "Frontend Developer", "es", { confirmedExperienceSuggestions: proposals });
   assert.doesNotMatch(unconfirmed.plainText, /interfaz en Angular|flujo principal con Selenium/);
@@ -207,10 +207,136 @@ HTML | CSS`;
   const confirmed = buildAdaptedResume(source, result, "Frontend Developer", "es", {
     confirmedExperienceSuggestions: proposals.map((proposal) => ({ ...proposal, included: true })),
   });
-  assert.match(confirmed.plainText, /Desarrolladora Frontend - Empresa Uno[\s\S]*interfaz en Angular/);
-  assert.match(confirmed.plainText, /Claves para esta oferta: TypeScript \| Angular \| Selenium/);
+  assert.match(confirmed.plainText, /Desarrolladora Frontend - Empresa Uno[\s\S]*componentes e interfaces reutilizables con Angular y TypeScript/);
+  assert.match(confirmed.plainText, /Habilidades técnicas: TypeScript \| Angular \| Selenium/);
   assert.doesNotMatch(confirmed.plainText, /Asistente de Marketing[\s\S]*interfaz en Angular/);
   assert.equal(analyzeResume(confirmed.plainText, vacancy, "es").score, 100);
+});
+
+test("orders professional experience from the current role to the oldest one", () => {
+  const source = `María Torres
+Diseñadora gráfica
+maria@example.com
+EXPERIENCIA PROFESIONAL
+Diseñadora junior - Estudio Uno | Lima, Perú 2018 - 2020
+• Diseñar piezas para redes sociales.
+Diseñadora senior - Estudio Dos | Lima, Perú 05/2023 - Presente
+• Liderar proyectos de identidad visual.
+Diseñadora gráfica - Estudio Tres | Lima, Perú 2021 - 04/2023
+• Crear campañas y materiales impresos.
+HABILIDADES
+Photoshop | Illustrator`;
+  const result = analyzeResume(source, "Puesto: Diseñadora gráfica\nRequisitos: Photoshop e Illustrator.", "es");
+  const document = buildAdaptedResume(source, result, "Diseñadora gráfica", "es");
+  const experience = document.sections.find((section) => section.kind === "experience");
+
+  assert.deepEqual(experience.blocks.map((block) => block.title), [
+    "Diseñadora senior - Estudio Dos | Lima, Perú",
+    "Diseñadora gráfica - Estudio Tres | Lima, Perú",
+    "Diseñadora junior - Estudio Uno | Lima, Perú",
+  ]);
+});
+
+test("merges confirmed Vue skills into the existing Frontend and tools rows", () => {
+  const source = `David Torres
+Frontend Developer
+david@example.com
+EXPERIENCIA PROFESIONAL
+Frontend Developer - Empresa Real | Lima, Perú 2022 - Presente
+• Desarrollar interfaces con React.
+HABILIDADES
+Frontend: HTML5, CSS3, JavaScript, TypeScript, React y Vite.
+Herramientas: Git, GitHub y Jira.`;
+  const vacancy = "Puesto: Front End Vue.js\nRequisitos: Vue 2, Vue 3, JavaScript, TypeScript, CSS, HTML, Vuex, Pinia, Git y Sourcetree.";
+  const result = analyzeResume(source, vacancy, "es");
+  const document = buildAdaptedResume(source, result, "Front End Vue.js", "es", {
+    confirmedExperienceSuggestions: [{
+      included: true,
+      roleTitle: "Frontend Developer - Empresa Real | Lima, Perú",
+      coveredKeywords: ["Vue.js", "Vuex", "Pinia", "Sourcetree"],
+      bullets: ["Desarrollar interfaces con Vue.js, Vuex y Pinia, gestionando el código con Git y Sourcetree."],
+    }],
+  });
+
+  assert.match(document.plainText, /Frontend: HTML5, CSS3, JavaScript, TypeScript, React y Vite, Vue\.js, Vuex, Pinia/);
+  assert.match(document.plainText, /Herramientas: Git, GitHub y Jira, Sourcetree/);
+  assert.doesNotMatch(document.plainText, /Habilidades técnicas:/);
+});
+
+test("writes Vue experience as a real responsibility instead of generic keyword filler", () => {
+  const source = `David Torres
+Frontend Developer
+david@example.com
+EXPERIENCIA PROFESIONAL
+Frontend Developer - Empresa Real | Lima, Perú 2022 - Presente
+• Desarrollar interfaces con React y TypeScript.
+HABILIDADES
+Frontend: HTML5, CSS3, JavaScript, TypeScript y React.
+Herramientas: Git.`;
+  const vacancy = `Puesto: Front End Vue.js
+Requisitos: Vue 2, Vue 3, JavaScript, TypeScript, CSS, HTML, Vuex, Pinia, Git y Sourcetree.`;
+  const result = analyzeResume(source, vacancy, "es");
+  const proposals = automaticExperienceSuggestions(result, "Front End Vue.js", source, "es");
+
+  assert.deepEqual(new Set(result.keywordMatch.missing), new Set(["Vue 2", "Vue 3", "Vuex", "Pinia", "Sourcetree"]));
+  assert.equal(proposals.length, 3);
+  assert.equal(proposals[0].bullets[0], "Desarrollar componentes e interfaces reutilizables con Vue 2 y Vue 3.");
+  assert.equal(proposals[1].bullets[0], "Gestionar el estado y los flujos de datos de la interfaz con Vuex y Pinia.");
+  assert.match(proposals[2].bullets[0], /Gestionar ramas, cambios y revisiones de código con Sourcetree/);
+  assert.doesNotMatch(proposals.flatMap((proposal) => proposal.bullets).join(" "), /dentro del flujo principal|Documentar la arquitectura|historial de cambios con Git/i);
+});
+
+test("distributes tailored responsibilities across compatible work experience", () => {
+  const source = `David Torres
+Frontend Developer
+david@example.com
+EXPERIENCIA PROFESIONAL
+Frontend Developer - Empresa Uno | Lima, Perú 2023 - Presente
+• Desarrollar interfaces con React.
+Desarrollador Web - Empresa Dos | Lima, Perú 2021 - 2023
+• Implementar portales corporativos con JavaScript.
+Programador Frontend - Empresa Tres | Lima, Perú 2019 - 2021
+• Mantener componentes y estilos responsive.
+Asistente de Marketing - Empresa Cuatro | Lima, Perú 2018 - 2019
+• Preparar contenidos para campañas.
+HABILIDADES
+React | JavaScript | Git`;
+  const vacancy = `Puesto: Front End Vue.js
+Requisitos: Vue 2, Vue 3, Vuex, Pinia, Selenium, AWS y Sourcetree.`;
+  const result = analyzeResume(source, vacancy, "es");
+  const proposals = automaticExperienceSuggestions(result, "Front End Vue.js", source, "es");
+  const assignedRoles = new Set(proposals.map((proposal) => proposal.roleTitle));
+
+  assert.ok(proposals.length >= 4);
+  assert.equal(assignedRoles.size, 3);
+  assert.ok([...assignedRoles].every((title) => /Frontend|Desarrollador Web|Programador/i.test(title)));
+  assert.ok(proposals.every((proposal) => !/Marketing/i.test(proposal.roleTitle)));
+  assert.deepEqual(new Set(proposals.flatMap((proposal) => proposal.coveredKeywords)), new Set(result.keywordMatch.missing));
+
+  const confirmed = buildAdaptedResume(source, result, "Front End Vue.js", "es", {
+    confirmedExperienceSuggestions: proposals.map((proposal) => ({ ...proposal, included: true })),
+  });
+  const experience = confirmed.sections.find((section) => section.kind === "experience");
+  const enrichedRoles = experience.blocks.filter((block) => block.type === "entry" && block.bullets.some((bullet) => /Vue|Pinia|Selenium|AWS|Sourcetree/i.test(bullet)));
+  assert.equal(enrichedRoles.length, 3);
+});
+
+test("describes tools as part of a real responsibility across non-software professions", () => {
+  const designResume = `Lucía Ramos
+Diseñadora gráfica
+lucia@example.com
+EXPERIENCIA PROFESIONAL
+Diseñadora gráfica - Agencia Real 2022 - Presente
+• Crear piezas para redes sociales.`;
+  const designResult = analyzeResume(designResume, "Puesto: Diseñadora gráfica\nRequisitos: Photoshop, Illustrator e InDesign.", "es");
+  const designProposal = automaticExperienceSuggestions(designResult, "Diseñadora gráfica", designResume, "es")[0];
+  assert.match(designProposal.bullets[0], /^Diseñar piezas, interfaces y entregables visuales con Adobe Photoshop, Adobe Illustrator y Adobe InDesign/);
+  assert.doesNotMatch(designProposal.bullets[0], /usar|integrar|incorporar|aplicar/i);
+
+  const legalResult = analyzeResume(legalResume, "Puesto: Abogada corporativa\nRequisitos: cumplimiento normativo y debida diligencia.", "es");
+  const legalProposal = automaticExperienceSuggestions(legalResult, "Abogada corporativa", legalResume, "es")[0];
+  assert.match(legalProposal.bullets[0], /^Analizar contratos, expedientes y riesgos relacionados con/);
+  assert.doesNotMatch(legalProposal.bullets[0], /caso simulado|proyecto práctico/i);
 });
 
 test("adapts only supported content and keeps missing requirements out of the exported resume", () => {

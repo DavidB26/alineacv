@@ -10,7 +10,7 @@ import { extractPdfOperatorItems, extractPdfPageText } from "./pdf-text-extracti
 import { repairWrappedResumeLines } from "./resume-improvements.mjs";
 
 type Language = "es" | "en";
-type Status = "idle" | "reading" | "analyzing" | "ready" | "error";
+type Status = "idle" | "reading" | "loading-job" | "analyzing" | "ready" | "error";
 const dictionary = {
   es: {
     privacy: "Tu CV y la vacante se analizan en este dispositivo.",
@@ -38,12 +38,13 @@ const dictionary = {
     reading: "Leyendo el contenido…",
     ready: "Listo para analizar",
     words: "palabras detectadas",
-    vacancyLabel: "Descripción de la vacante (obligatoria)",
-    vacancyHelp: "Pega la descripción completa, incluyendo funciones y requisitos. Necesitamos una vacante para comparar tu CV.",
+    vacancyLabel: "Pega la descripción",
+    vacancyHelp: "Incluye las funciones y los requisitos del puesto.",
     vacancyPlaceholder: "Ej. Buscamos analista de datos con experiencia en SQL, Power BI, Python…",
-    vacancyUrlLabel: "Enlace de la oferta (opcional)",
-    vacancyUrlHelp: "Lo conservamos como referencia de esta postulación. Pega también la descripción para realizar el análisis local.",
+    vacancyUrlLabel: "Usa el enlace de la oferta",
+    vacancyUrlHelp: "Leeremos la publicación para completar el análisis.",
     vacancyUrlPlaceholder: "https://empresa.com/empleos/vacante",
+    vacancyUrlLoading: "Leyendo la oferta…",
     vacancyReady: "Vacante añadida: ya podemos comparar sus palabras clave con tu CV.",
     analyze: "Analizar mi CV",
     analyzeAndAdapt: "Analizar CV y oferta",
@@ -93,6 +94,7 @@ const dictionary = {
       size: "El archivo debe pesar menos de 10 MB.",
       empty: "No pudimos extraer suficiente texto. Si es un CV escaneado, expórtalo nuevamente con texto seleccionable.",
       generic: "No pudimos leer este archivo. Prueba exportándolo nuevamente como PDF o DOCX.",
+      jobUrl: "No pudimos leer ese enlace. Pega la descripción de la oferta para continuar.",
     },
   },
   en: {
@@ -121,12 +123,13 @@ const dictionary = {
     reading: "Reading content…",
     ready: "Ready to analyze",
     words: "words detected",
-    vacancyLabel: "Job description (required)",
-    vacancyHelp: "Paste the full description, including duties and requirements. A job description is needed to compare your resume.",
+    vacancyLabel: "Paste the job description",
+    vacancyHelp: "Include the role's responsibilities and requirements.",
     vacancyPlaceholder: "e.g. We are looking for a data analyst with SQL, Power BI and Python experience…",
-    vacancyUrlLabel: "Job link (optional)",
-    vacancyUrlHelp: "We keep it as a reference for this application. Paste the description as well to run the analysis locally.",
+    vacancyUrlLabel: "Use the job posting link",
+    vacancyUrlHelp: "We will read the posting to complete the analysis.",
     vacancyUrlPlaceholder: "https://company.com/jobs/opening",
+    vacancyUrlLoading: "Reading the job posting…",
     vacancyReady: "Job description added: we can now compare its keywords with your resume.",
     analyze: "Analyze my resume",
     analyzeAndAdapt: "Analyze resume and job",
@@ -176,6 +179,7 @@ const dictionary = {
       size: "The file must be smaller than 10 MB.",
       empty: "We could not extract enough text. If the resume is scanned, export it again with selectable text.",
       generic: "We could not read this file. Try exporting it again as PDF or DOCX.",
+      jobUrl: "We could not read that link. Paste the job description to continue.",
     },
   },
 } as const;
@@ -238,6 +242,7 @@ export default function AtsAnalyzer() {
   const targetText = jobDescription;
   const [result, setResult] = useState<ReturnType<typeof analyzeResume> | null>(null);
   const [error, setError] = useState("");
+  const [jobError, setJobError] = useState("");
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const copy = dictionary[language];
@@ -293,18 +298,42 @@ export default function AtsAnalyzer() {
   }
 
   async function runAnalysis() {
-    if (status !== "ready" || !resumeText || !targetText.trim()) return;
+    if (status !== "ready" || !resumeText) return;
     const version = readVersion.current;
+    let description = targetText.trim();
+    setJobError("");
+    if (!description && jobUrl.trim()) {
+      setStatus("loading-job");
+      try {
+        const response = await fetch("/api/job-description", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url: jobUrl.trim() }),
+        });
+        const payload = await response.json() as { description?: string };
+        if (!response.ok || !payload.description?.trim()) throw new Error("unavailable");
+        if (version !== readVersion.current) return;
+        description = payload.description.trim();
+        setJobDescription(description);
+      } catch {
+        if (version !== readVersion.current) return;
+        setStatus("ready");
+        setJobError(copy.errors.jobUrl);
+        return;
+      }
+    }
+    if (!description) return;
     setStatus("analyzing");
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     if (version !== readVersion.current) return;
-    const nextResult = analyzeResume(resumeText, targetText, language, "vacancy");
+    const nextResult = analyzeResume(resumeText, description, language, "vacancy");
     setResult(nextResult);
     setStatus("ready");
   }
 
   function updateVacancy(description: string) {
     setJobDescription(description);
+    setJobError("");
     setResult(null);
   }
 
@@ -315,6 +344,7 @@ export default function AtsAnalyzer() {
     setResumeText("");
     setResult(null);
     setError("");
+    setJobError("");
   }
 
   function changeLanguage(nextLanguage: Language) {
@@ -326,7 +356,7 @@ export default function AtsAnalyzer() {
 
   const wordCount = resumeText ? resumeText.split(/\s+/).filter(Boolean).length : 0;
   const es = language === "es";
-  const hasTarget = targetText.trim().length > 0;
+  const hasTarget = targetText.trim().length > 0 || jobUrl.trim().length > 0;
   const targetLabel = vacancyLabel(jobDescription, language);
   const versionName = adaptedVersionName(targetLabel, vacancyCompany(jobDescription), language);
 
@@ -366,7 +396,7 @@ export default function AtsAnalyzer() {
           <p className="ats-focus-limits">{es ? "ATS es el sistema que algunas empresas usan para procesar CV. Esta revisión te orienta; no garantiza superar sus filtros." : "An ATS is a system some companies use to process resumes. This review offers guidance; it does not guarantee passing their filters."}</p>
         </div>
 
-        <form className="ats-focus-form" onSubmit={(event) => { event.preventDefault(); void runAnalysis(); }} aria-busy={status === "reading" || status === "analyzing"}>
+        <form className="ats-focus-form" onSubmit={(event) => { event.preventDefault(); void runAnalysis(); }} aria-busy={status === "reading" || status === "loading-job" || status === "analyzing"}>
           <div className="ats-focus-step"><span>1</span><h2>{copy.uploadTitle}</h2></div>
           <input ref={inputRef} className="visually-hidden" type="file" aria-label={copy.choose} tabIndex={-1} accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={onInputChange} />
           {!file ? <div className={`ats-focus-dropzone ${dragging ? "dragging" : ""}`}
@@ -380,23 +410,24 @@ export default function AtsAnalyzer() {
             <button type="button" onClick={reset} aria-label={copy.remove}>×</button>
           </div>}
           {error && <p className="ats-focus-error" role="alert">{error}</p>}
-          <fieldset className="ats-focus-target" disabled={status === "analyzing"}>
+          <fieldset className="ats-focus-target" disabled={status === "loading-job" || status === "analyzing"}>
             <legend className="ats-focus-step"><span>2</span>{es ? "Cuéntanos a qué postulas" : "Tell us what you are applying for"}</legend>
             <div className="ats-target-fields">
-              <div>
-                <label className="ats-target-label" htmlFor="ats-target">{es ? "Pega la oferta laboral" : "Paste the job description"}</label>
-                <textarea id="ats-target" required maxLength={18_000} value={jobDescription} onChange={(event) => updateVacancy(event.target.value)} placeholder={copy.vacancyPlaceholder} rows={7} aria-describedby="ats-target-help" />
-                <p id="ats-target-help">{es ? "Incluye funciones, herramientas y requisitos. Cuanto más completa, mejor será la adaptación." : "Include duties, tools and requirements. More detail produces a stronger adaptation."}</p>
+              <div className="ats-target-description">
+                <label className="ats-target-label" htmlFor="ats-target">{copy.vacancyLabel}</label>
+                <textarea id="ats-target" maxLength={18_000} value={jobDescription} onChange={(event) => updateVacancy(event.target.value)} placeholder={copy.vacancyPlaceholder} rows={7} aria-describedby="ats-target-help" />
+                <p id="ats-target-help">{copy.vacancyHelp}</p>
               </div>
-              <div>
+              <div className="ats-target-divider"><span>{es ? "o" : "or"}</span></div>
+              <div className="ats-target-url">
                 <label className="ats-target-label" htmlFor="ats-job-url">{copy.vacancyUrlLabel}</label>
-                <input id="ats-job-url" type="url" maxLength={2_000} value={jobUrl} onChange={(event) => setJobUrl(event.target.value)} placeholder={copy.vacancyUrlPlaceholder} aria-describedby="ats-job-url-help" />
+                <input id="ats-job-url" type="url" maxLength={2_000} value={jobUrl} onChange={(event) => { setJobUrl(event.target.value); setJobError(""); setResult(null); }} placeholder={copy.vacancyUrlPlaceholder} aria-describedby="ats-job-url-help" />
                 <p id="ats-job-url-help">{copy.vacancyUrlHelp}</p>
               </div>
             </div>
+            {jobError && <p className="ats-focus-error ats-target-error" role="alert">{jobError}</p>}
           </fieldset>
-          <button type="submit" className="ats-focus-submit" disabled={status !== "ready" || !hasTarget}>{status === "analyzing" ? copy.analyzing : copy.analyze}<span aria-hidden="true">→</span></button>
-          <p className="ats-focus-private">{es ? "Sin registro. Tu CV y el texto se analizan en este dispositivo." : "No account needed. Your resume and text are analyzed on this device."}</p>
+          <button type="submit" className="ats-focus-submit" disabled={status !== "ready" || !hasTarget}>{status === "loading-job" ? copy.vacancyUrlLoading : status === "analyzing" ? copy.analyzing : copy.analyze}<span aria-hidden="true">→</span></button>
         </form>
       </section> : <section className="ats-workspace has-report" aria-label={es ? "Resultado del análisis" : "Analysis results"}>
         <AtsReport key={language + targetText} result={result} resumeText={resumeText} jobDescription={jobDescription} fileName={file?.name || (es ? "CV analizado" : "Analyzed resume")} targetLabel={targetLabel} versionName={versionName} language={language} onReset={reset} onEdit={() => setResult(null)} />
