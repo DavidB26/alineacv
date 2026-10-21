@@ -1,3 +1,4 @@
+import { employmentDuration } from "./employment-duration.mjs";
 const STOP_WORDS = new Set(`
   para como desde hasta entre sobre esta este estos estas una uno unos unas del las los con sin por que
   quien donde cuando cual sus tus nuestro nuestra muy mas cada debe tener tienes dominas sera son lugar
@@ -271,12 +272,14 @@ function numericValue(value) {
   return compound ? SPANISH_NUMBER_VALUES.get(compound[1]) + SPANISH_NUMBER_VALUES.get(compound[2]) : Number.NaN;
 }
 
-function statedExperienceYears(text) {
+function statedExperienceYears(text, excludeDriving = false) {
   const patterns = [
     new RegExp(String.raw`(?:\+|mas de|al menos|minim[oa](?: de)?|minimum of|at least)?\s*(${NUMBER_VALUE})\s+(?:anos?|years?)(?:\s+de)?\s+experiencia`, "g"),
     new RegExp(String.raw`\bexperiencia(?:\s+minima)?(?:\s+de|\s+de al menos|\s+de mas de|\s+minimum of|\s+at least)?\s+(${NUMBER_VALUE})\s+(?:anos?|years?)`, "g"),
   ];
-  return patterns.flatMap((pattern) => [...text.matchAll(pattern)].map((match) => numericValue(match[1]))).filter(Number.isFinite);
+  return patterns.flatMap((pattern) => [...text.matchAll(pattern)]
+    .filter((match) => !excludeDriving || !/^(?:\s+(?:de|en))?\s+(?:conduccion|manejo|driving)\b/.test(text.slice(match.index + match[0].length)))
+    .map((match) => numericValue(match[1]))).filter(Number.isFinite);
 }
 const MEASURABLE_UNIT = String.raw`(?:
   por\s+ciento|percent|mil|k|millon(?:es)?|million(?:s)?|
@@ -469,16 +472,24 @@ function eligibilityChecks(jobDescription, resumeText, language) {
     });
   }
 
-  const requiredYears = statedExperienceYears(job).sort((a, b) => b - a)[0];
+  const requiredYears = statedExperienceYears(job, true).sort((a, b) => b - a)[0];
   if (Number.isFinite(requiredYears)) {
-    const declaredYears = statedExperienceYears(resume).sort((a, b) => b - a)[0];
+    const declaredYears = statedExperienceYears(resume, true).sort((a, b) => b - a)[0];
+    const duration = employmentDuration(resumeText);
+    const timelineYears = duration.ranges.length ? duration.years : Number.NaN;
+    const availableYears = Number.isFinite(declaredYears) ? declaredYears : timelineYears;
+    const subjectSpecific = /\b(?:en|in)\s+(?:hidrogeolog|desarrollo|diseno|marketing|contabilidad|mineria|mining|software|frontend|backend)/.test(job);
     checks.push({
       id: "eligibility-experience",
+      draftText: duration.ranges.length ? localized(language, `Experiencia profesional acumulada de ${duration.years} años y ${duration.months % 12} meses, según los periodos laborales del CV.`, `Total professional experience of ${duration.years} years and ${duration.months % 12} months, based on employment dates.`) : localized(language, `${requiredYears}+ años de experiencia profesional.`, `${requiredYears}+ years of professional experience.`),
       label: localized(language, `${requiredYears}+ años de experiencia`, `${requiredYears}+ years of experience`),
-      status: Number.isFinite(declaredYears) ? (declaredYears >= requiredYears ? "matched" : "missing") : "review",
+      status: Number.isFinite(availableYears)
+        ? (availableYears >= requiredYears ? (subjectSpecific && !Number.isFinite(declaredYears) ? "review" : "matched") : "missing") : "review",
       evidence: Number.isFinite(declaredYears)
         ? localized(language, `El CV declara ${declaredYears} años de experiencia.`, `The resume states ${declaredYears} years of experience.`)
-        : localized(language, "Revisa las fechas laborales; el CV no declara un total explícito.", "Review employment dates; the resume does not state an explicit total."),
+        : Number.isFinite(timelineYears)
+          ? localized(language, `Las fechas laborales suman ${duration.years} años y ${duration.months % 12} meses${duration.approximate ? " estimados" : ""}, sin duplicar periodos superpuestos. Confirma cuántos corresponden a la especialidad solicitada.`, `Employment dates total ${duration.years} years and ${duration.months % 12} months, without overlapping periods. Confirm how much is in the required field.`)
+          : localized(language, "Revisa las fechas laborales; no se reconocieron periodos completos ni un total explícito.", "Review employment dates; no complete intervals or explicit total were recognized."),
     });
   }
 
@@ -516,11 +527,13 @@ function eligibilityChecks(jobDescription, resumeText, language) {
         : localized(language, "Añade un enlace directo a trabajos que puedas demostrar.", "Add a direct link to work you can demonstrate."),
     });
   }
-  const license = job.match(/licencia de conducir\s*([ab]\s*[- ]?\s*\d(?:\s*[abc])?)/i);
+  const license = job.match(/licencia de conducir\s*([ab]\s*[- ]?\s*\d(?:\s*[abc]\b)?)/i);
   if (license) {
-    const declared = resume.match(/licencia de conducir\s*([ab]\s*[- ]?\s*\d(?:\s*[abc])?)/i);
+    const declared = resume.match(/licencia de conducir\s*([ab]\s*[- ]?\s*\d(?:\s*[abc]\b)?)/i);
     checks.push({
-      id: "eligibility-driving", label: localized(language, "Licencia de conducir " + license[1].toUpperCase(), "Driving license " + license[1].toUpperCase()),
+      id: "eligibility-driving",
+      draftText: declared ? localized(language, "Licencia de conducir " + declared[1].toUpperCase() + ". Experiencia de conducción en mina.", "Driving license " + declared[1].toUpperCase() + ". Mine driving experience.") : localized(language, "Licencia de conducir " + license[1].toUpperCase() + ". Experiencia de conducción en mina.", "Driving license " + license[1].toUpperCase() + ". Mine driving experience."),
+      label: localized(language, "Licencia de conducir " + license[1].toUpperCase(), "Driving license " + license[1].toUpperCase()),
       status: "review",
       evidence: declared
         ? localized(language, "El CV declara " + declared[1].toUpperCase() + ". Verifica vigencia, categoría y experiencia de manejo en mina.", "The resume states " + declared[1].toUpperCase() + ". Verify validity, category and mine driving experience.")

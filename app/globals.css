@@ -1179,3 +1179,16 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .aggressive-proposal > div { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .aggressive-proposal button:disabled { cursor: default; opacity: .5; }
 .aggressive-proposal > [role="status"] { display: block; margin-top: 8px; font-size: .8rem; }
+
+.offer-eligibility li { flex-wrap: wrap; }
+.offer-eligibility li > .eligibility-confirmation { flex: 1 1 100%; display: grid; gap: 6px; }
+.eligibility-confirmation label { color: #263b4a; font-size: .75rem; }
+.eligibility-confirmation textarea { width: 100%; padding: 8px; border: 1px solid #bccbd2; border-radius: 7px; background: #fff; color: #263b4a; font: inherit; font-size: .8rem; resize: vertical; }
+.eligibility-confirmation button { justify-self: start; padding: 8px 12px; border: 1px solid #286f56; border-radius: 8px; color: #fff; background: #286f56; font: inherit; font-size: .75rem; cursor: pointer; }
+.eligibility-confirmation button:disabled { opacity: .5; cursor: default; }
+
+@media print {
+  .reference-skills-group > .reference-section { margin-top: 2.6mm; }
+  .reference-skills-group h3 { margin: 0 0 1.5mm; font-size: 9.8pt; font-weight: 700; break-after: avoid; }
+  .reference-section-technicalSkills .reference-entry li, .reference-section-softSkills .reference-entry li { margin-bottom: .7mm; }
+}

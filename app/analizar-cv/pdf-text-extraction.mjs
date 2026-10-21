@@ -10,11 +10,11 @@ const HEADING_TYPES = new Map([
   ["lenguaje", "languages"], ["lenguajes", "languages"], ["idioma", "languages"], ["idiomas", "languages"], ["languages", "languages"],
   ["hobbies", "interests"], ["intereses", "interests"], ["interests", "interests"],
   ["educacion", "education"], ["formacion academica", "education"], ["education", "education"],
-  ["formacion profesional complementaria", "certifications"], ["formacion complementaria", "certifications"], ["software y herramientas", "skills"], ["competencias tecnicas", "skills"], ["habilidades blandas", "skills"], ["certificaciones", "certifications"], ["cursos", "certifications"], ["certifications", "certifications"],
+  ["formacion profesional complementaria", "certifications"], ["formacion complementaria", "certifications"], ["software y herramientas", "tools"], ["competencias tecnicas", "technicalSkills"], ["habilidades blandas", "softSkills"], ["soft skills", "softSkills"], ["certificaciones", "certifications"], ["cursos", "certifications"], ["certifications", "certifications"],
   ["algunos trabajos mios", "projects"], ["proyectos", "projects"], ["proyectos relevantes", "projects"], ["projects", "projects"],
 ]);
 
-const SECTION_ORDER = ["profile", "experience", "education", "skills", "projects", "certifications", "languages", "interests", "contact"];
+const SECTION_ORDER = ["profile", "experience", "education", "tools", "skills", "technicalSkills", "softSkills", "projects", "certifications", "languages", "interests", "contact"];
 
 function cleanPdfText(value) {
   return String(value ?? "").normalize("NFKC").replace(/\s+/g, " ").trim();
@@ -172,7 +172,7 @@ function contentForHeading(atoms, heading, headings, boundary) {
     && atom.y > lowerY + 4
     && !HEADING_TYPES.has(normalize(atom.text)));
 
-  if (["skills", "languages", "interests"].includes(heading.type)) return columnCards(sideAtoms);
+  if (["tools", "skills", "technicalSkills", "softSkills", "languages", "interests"].includes(heading.type)) return columnCards(sideAtoms);
   return groupRows(sideAtoms);
 }
 

@@ -602,11 +602,37 @@ function entryBlocks(lines) {
   return entries;
 }
 
+function certificationBlocks(lines) {
+  // Associate courses with the institution immediately preceding them. Preserve
+  // unstructured text if no date or bullet identifies a course reliably.
+  const blocks = [];
+  let provider = [];
+  let providerUsed = false;
+  for (const line of lines) {
+    const cleaned = preserveResumeBullet(line);
+    const split = splitResumeEntry(cleaned);
+    if (isBullet(line) || split.date) {
+      blocks.push({ type: "entry", title: split.title || cleaned, date: split.date, meta: [...provider], bullets: [] });
+      providerUsed = true;
+    } else {
+      if (providerUsed) { provider = []; providerUsed = false; }
+      provider.push(cleaned);
+    }
+  }
+  if (!providerUsed) blocks.push(...provider.map(text => ({ type: "paragraph", text })));
+  return blocks;
+}
+
 function sectionBlocks(kind, lines, language) {
   if (kind === "experience" || kind === "projects" || kind === "education" || kind === "training") {
     return entryBlocks(lines, language);
   }
-  if (kind === "certifications") return lines.map((line) => ({ type: "paragraph", text: preserveResumeBullet(line) }));
+  if (kind === "certifications") return certificationBlocks(lines);
+  if (kind === "softSkills" || kind === "technicalSkills") return [{ type: "entry", title: "", date: "", meta: [], bullets: lines.map(preserveResumeBullet) }];
+  if (kind === "tools") return lines.flatMap(line => line.split(/[•▪‣]/)).map(preserveResumeBullet).filter(Boolean).map(line => {
+    const colon = line.indexOf(":");
+    return colon > 0 ? { type: "row", label: line.slice(0, colon), value: line.slice(colon + 1).trim() } : { type: "paragraph", text: line };
+  });
   if (kind === "skills" || kind === "specializations" || kind === "languages") {
     return lines.map((line) => {
       const separator = line.indexOf(":");
@@ -624,7 +650,10 @@ const SECTION_HEADINGS = {
     specializations: "ÁREAS DE ESPECIALIZACIÓN",
     experience: "EXPERIENCIA PROFESIONAL",
     projects: "PROYECTOS RELEVANTES",
+    tools: "SOFTWARE Y HERRAMIENTAS",
+    technicalSkills: "COMPETENCIAS TÉCNICAS",
     skills: "HABILIDADES",
+    softSkills: "HABILIDADES BLANDAS",
     training: "HABILIDADES EN DESARROLLO",
     certifications: "CURSOS Y CERTIFICACIONES",
     education: "FORMACIÓN ACADÉMICA",
@@ -637,7 +666,10 @@ const SECTION_HEADINGS = {
     specializations: "AREAS OF EXPERTISE",
     experience: "PROFESSIONAL EXPERIENCE",
     projects: "RELEVANT PROJECTS",
+    tools: "SOFTWARE AND TOOLS",
+    technicalSkills: "TECHNICAL COMPETENCIES",
     skills: "SKILLS",
+    softSkills: "SOFT SKILLS",
     training: "SKILLS IN DEVELOPMENT",
     certifications: "COURSES AND CERTIFICATIONS",
     education: "EDUCATION",
@@ -647,7 +679,7 @@ const SECTION_HEADINGS = {
   },
 };
 
-const SECTION_ORDER = ["profile", "specializations", "experience", "projects", "skills", "training", "certifications", "education", "languages", "interests", "other"];
+const SECTION_ORDER = ["profile", "specializations", "experience", "projects", "education", "certifications", "tools", "skills", "technicalSkills", "softSkills", "training", "languages", "interests", "other"];
 
 const SOFT_SKILLS = new Set([
   "Atención al detalle", "Comunicación", "Liderazgo", "Trabajo en equipo", "Resolución de problemas",
@@ -937,7 +969,12 @@ function sortExperienceNewestFirst(blocks) {
 
 function documentText(document) {
   const parts = [document.name, document.headline, ...document.contactLines].filter(Boolean);
+  let skillHeadingAdded = false;
   for (const section of document.sections) {
+    if (document.skillGroupHeading && !skillHeadingAdded && ["tools", "skills", "technicalSkills", "softSkills"].includes(section.kind)) {
+      parts.push("", document.skillGroupHeading);
+      skillHeadingAdded = true;
+    }
     parts.push("", section.heading);
     for (const block of section.blocks) {
       if (block.type === "entry") {
@@ -965,6 +1002,15 @@ export function buildAdaptedResume(sourceText, result, targetLabel, language = "
     if (!originalHeadings.has(section.kind)) originalHeadings.set(section.kind, section.heading.replace(/\s*[-–—]\s*(?:continuacion|continuación|continued)$/i, ""));
   }
 
+  // A language can be listed among software in the source; give it its own
+  // section while keeping its original wording and declared level.
+  if (grouped.has("tools")) {
+    const tools = grouped.get("tools").flatMap(line => line.split(/[•▪‣]/)).map(preserveResumeBullet).filter(Boolean);
+    const languages = tools.filter(line => /^(?:ingles|inglés|español|frances|francés|portugues|portugués|aleman|alemán|english|spanish)\b/i.test(line));
+    grouped.set("tools", tools.filter(line => !languages.includes(line)));
+    if (languages.length) grouped.set("languages", [...(grouped.get("languages") ?? []), ...languages]);
+  }
+
   const name = inferResumeName(sourceText, options.fileName ?? "", parsed.header);
   const headline = inferResumeHeadline(sourceText, requestedTarget, parsed.header, name);
   const profile = adaptProfile(recoverProfileText(grouped.get("profile") ?? [], parsed.header, name, headline), skillPlan);
@@ -985,7 +1031,7 @@ export function buildAdaptedResume(sourceText, result, targetLabel, language = "
   for (const kind of SECTION_ORDER) {
     let lines = grouped.get(kind) ?? [];
     const recoveredBlocks = grouped.get(kind + "Blocks");
-    const generatedSkills = false;
+    const generatedSkills = kind === "skills" && !lines.length && confirmedKeywords.length > 0;
     const generatedTraining = false;
     if (!lines.length && !recoveredBlocks?.length && !generatedSkills && !generatedTraining) continue;
     if (kind === "experience" || kind === "projects") lines = prioritizeSectionLines(lines, matched, language);
@@ -1020,10 +1066,24 @@ export function buildAdaptedResume(sourceText, result, targetLabel, language = "
     });
   }
 
+  const confirmedEligibility = (options.confirmedEligibility ?? []).filter((item) => item.confirmed && item.text?.trim());
+  if (confirmedEligibility.length) sections.push({
+    kind: "confirmedEligibility", heading: language === "es" ? "ADICIONES PARA LA OFERTA" : "ADDITIONS FOR THE ROLE",
+    blocks: confirmedEligibility.map((item) => ({ type: "paragraph", text: item.text.trim() })),
+  });
+  const skillSections = sections.filter(section => ["tools", "skills", "technicalSkills", "softSkills"].includes(section.kind));
+  if (skillSections.length > 1) {
+    const subtitles = language === "es"
+      ? { tools: "SOFTWARE Y HERRAMIENTAS", skills: "CONOCIMIENTOS", technicalSkills: "TÉCNICAS", softSkills: "INTERPERSONALES" }
+      : { tools: "SOFTWARE AND TOOLS", skills: "KNOWLEDGE", technicalSkills: "TECHNICAL", softSkills: "INTERPERSONAL" };
+    for (const section of skillSections) section.heading = subtitles[section.kind];
+  }
   const document = {
     name,
     headline: headline || originalHeadline(parsed.header) || (language === "es" ? "CV profesional" : "Professional resume"),
     contactLines: extractResumeContacts(sourceText),
+    skillGroupHeading: skillSections.length > 1
+      ? (language === "es" ? "HABILIDADES" : "SKILLS") : "",
     sections,
   };
   return { ...document, plainText: documentText(document) };
@@ -1057,13 +1117,12 @@ export function missingEvidenceQuestions(result, sourceText, language = "es") {
   const roles = (baseline.sections.find((section) => section.kind === "experience")?.blocks ?? [])
     .filter((block) => block.type === "entry" && block.title)
     .map((block) => ({ title: block.title, date: block.date }));
-  const drafts = automaticExperienceSuggestions(result, "", sourceText, language);
   const keywords = result.keywordMatch?.projectMissing ?? result.keywordMatch?.missing ?? [];
   return uniqueLines(keywords).filter((keyword) => !NON_SKILL_REQUIREMENTS.has(keyword) && !/^A[12](?:B)?$/i.test(keyword))
     .map((keyword, index) => {
-      const draft = drafts.find((item) => item.coveredKeywords?.includes(keyword));
+      const draft = automaticExperienceSuggestions({ ...result, keywordMatch: { ...result.keywordMatch, missing: [keyword], projectMissing: [keyword] } }, "", sourceText, language)[0];
       const roleIndex = draft ? roles.findIndex((role) => role.title === draft.roleTitle && role.date === draft.roleDate) : -1;
-      return { id: "evidence-" + index + "-" + normalize(keyword), keyword, roles, roleIndex: roleIndex < 0 ? "" : String(roleIndex), draftText: draft?.coveredKeywords?.length === 1 ? draft.bullets.join(" ") : "" };
+      return { id: "evidence-" + index + "-" + normalize(keyword), keyword, roles, roleIndex: roleIndex < 0 ? "" : String(roleIndex), draftText: draft?.bullets.join(" ") || (language === "es" ? "Aplicar " + keyword + " en las actividades del puesto." : "Apply " + keyword + " in role activities.") };
     });
 }
 
@@ -1075,4 +1134,11 @@ export function confirmResumeEvidence(question, answer) {
     id: question.id, included: true, roleTitle: role.title, roleDate: role.date,
     coveredKeywords: [question.keyword], bullets: [question.keyword + ": " + text],
   };
+}
+
+export function confirmEligibilityEvidence(item, answer) {
+  if (!answer?.confirmed) return null;
+  const text = String(answer.text ?? item.label).replace(/\s+/g, " ").trim();
+  if (!text) return null;
+  return { id: item.id, confirmed: true, text };
 }

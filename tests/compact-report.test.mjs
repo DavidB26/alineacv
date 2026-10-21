@@ -135,7 +135,7 @@ test("adapts the resume while separating supported and unverified skills", () =>
   assert.doesNotMatch(html, /Proyecto independiente|Proyecto completo recomendado|Qué debe incluir|Versión breve que irá al CV/);
   assert.doesNotMatch(html, /Usar este borrador|Confirmo que puedo respaldarlo e incluirlo|Versión guardada/);
   assert.match(html, /<textarea/);
-  assert.match(html, /Confirmar experiencia e incluir en el CV/);
+  assert.match(html, /Confirmar adición/);
   assert.match(html, /Descargar solo formato ATS/);
   assert.match(html, /Palabras clave de la vacante/);
   assert.match(html, /class="matched" aria-label="React: Encontradas"/);
@@ -165,10 +165,10 @@ test("keeps personal eligibility requirements outside skill coverage", () => {
   const result = analyzeResume(resume, fullVacancy, "es");
   const html = renderToStaticMarkup(createElement(AtsReport, { result, resumeText: resume, fileName: "camila-cv.pdf", targetLabel: "Desarrollador frontend", versionName: "CV - Desarrollador frontend", language: "es", onReset() {}, onEdit() {} }));
 
-  assert.match(html, /Requisitos personales por revisar/);
+  assert.match(html, /Adiciones sobre requisitos personales/);
   assert.match(html, /Idiomas, estudios, residencia y años de experiencia se mantienen separados/);
   assert.match(html, /Inglés C1/);
-  assert.match(html, /No acreditado/);
+  assert.match(html, /No encontrado en original/);
   assert.match(html, /El CV declara nivel INTERMEDIO/);
   const adaptedChanges = html.slice(html.indexOf("adapted-changes"), html.indexOf("offer-eligibility"));
   assert.doesNotMatch(adaptedChanges, /Inglés C1/);

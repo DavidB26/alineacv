@@ -72,7 +72,7 @@ test('preserves employers, roles, exact original bullet wording, months, educati
     const education = document.sections.find(s => s.kind === 'education');
     assert.deepEqual(education.blocks[0], { type: 'entry', title: 'Ingeniería Geológica', date: '2014 - 2018', meta: ['Universidad del Sur'], bullets: [] });
     assert.ok(document.sections.some(s => s.kind === 'certifications'));
-    assert.match(document.plainText, /Instituto Uno[\s\S]*Hidrogeología aplicada/);
+    assert.ok(document.sections.find(s => s.kind === "certifications").blocks.some(block => block.title === "Hidrogeología aplicada" && block.meta.includes("Instituto Uno")));
     for (const value of ['CIP: 123456', 'Arequipa, Perú', 'Licencia de conducir A2B', 'tres años de experiencia en conducción', 'He supervisado perforaciones y piezómetros.', 'FEFLOW y MODFLOW', 'Liderazgo y coordinación']) assert.ok(document.plainText.includes(value), value);
     assert.doesNotMatch(document.plainText, /HGA|ArcGIS|Slide2/);
   }

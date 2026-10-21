@@ -93,7 +93,7 @@ test("builds the one-column reference structure without truncating source bullet
   assert.equal(adapted.name, "Andrea Salazar");
   assert.equal(adapted.headline, "Abogada junior");
   assert.ok(adapted.contactLines.some((line) => line.includes("andrea@example.com")));
-  assert.deepEqual(adapted.sections.slice(0, 3).map((section) => section.kind), ["profile", "experience", "skills"]);
+  assert.deepEqual(adapted.sections.slice(0, 3).map((section) => section.kind), ["profile", "experience", "education"]);
   assert.match(adapted.plainText, /PERFIL PROFESIONAL/);
   assert.doesNotMatch(adapted.plainText, /ÁREAS DE ESPECIALIZACIÓN/);
   assert.match(adapted.plainText, /Revisé contratos y preparé expedientes para el equipo legal mediante coordinación interna,/);

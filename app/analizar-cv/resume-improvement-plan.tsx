@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { analyzeResume } from "./analysis.mjs";
-import { adaptedSkillPlan, buildAtsResume, buildAdaptedResume, missingEvidenceQuestions, confirmResumeEvidence } from "./adapted-resume.mjs";
+import { adaptedSkillPlan, buildAtsResume, buildAdaptedResume, missingEvidenceQuestions, confirmResumeEvidence, confirmEligibilityEvidence } from "./adapted-resume.mjs";
 
 type Language = "es" | "en";
 type ResumeBlock =
@@ -11,6 +11,8 @@ type ResumeBlock =
   | { type: "row"; label: string; value: string }
   | { type: "paragraph"; text: string };
 type EvidenceQuestion = { id: string; keyword: string; roles: Array<{ title: string; date: string }>; roleIndex: string; draftText: string };
+type EligibilityItem = { id: string; label: string; evidence: string; status: string; draftText?: string };
+type ConfirmedEligibility = { id: string; confirmed: boolean; text: string };
 type ConfirmedEvidence = { id: string; included: boolean; roleTitle: string; roleDate: string; coveredKeywords: string[]; bullets: string[] };
 type AdaptedDocument = {
   name: string;
@@ -18,6 +20,7 @@ type AdaptedDocument = {
   contactLines: string[];
   sections: Array<{ kind: string; heading: string; blocks: ResumeBlock[] }>;
   plainText: string;
+  skillGroupHeading?: string;
 };
 
 export function ReferenceResumeDocument({ resume, language }: { resume: AdaptedDocument; language: Language }) {
@@ -26,15 +29,9 @@ export function ReferenceResumeDocument({ resume, language }: { resume: AdaptedD
     resume.contactLines.filter((line) => line.includes("@") || !linkPattern.test(line)),
     resume.contactLines.filter((line) => !line.includes("@") && linkPattern.test(line)),
   ].filter((row) => row.length > 0);
-  return <article className="ats-export-document reference-resume" lang={language}>
-    <header className="reference-resume-header">
-      <h1>{resume.name}</h1>
-      <p>{resume.headline}</p>
-      {contactRows.length > 0 && <div>{contactRows.map((row, rowIndex) => <p className="reference-contact-row" key={rowIndex}>{row.map((line, index) => <span key={index}>{line}</span>)}</p>)}</div>}
-    </header>
-    <main>
-      {resume.sections.map((section) => <section className={"reference-section reference-section-" + section.kind} key={section.kind}>
-        <h2>{section.heading}</h2>
+  const skillSections = resume.sections.filter(section => ["tools", "skills", "technicalSkills", "softSkills"].includes(section.kind));
+  const renderSection = (section: AdaptedDocument["sections"][number], nested = false) => <section className={"reference-section reference-section-" + section.kind} key={section.kind}>
+        {nested ? <h3>{section.heading}</h3> : <h2>{section.heading}</h2>}
         {section.blocks.map((block, index) => {
           if (block.type === "entry") return <article className="reference-entry" key={index}>
             {(block.title || block.date) && <header><strong>{block.title}</strong>{block.date && <time>{block.date}</time>}</header>}
@@ -44,7 +41,22 @@ export function ReferenceResumeDocument({ resume, language }: { resume: AdaptedD
           if (block.type === "row") return <p className="reference-row" key={index}><strong>{block.label}:</strong><span>{block.value}</span></p>;
           return <p key={index}>{block.text}</p>;
         })}
-      </section>)}
+      </section>;
+  return <article className="ats-export-document reference-resume" lang={language}>
+    <header className="reference-resume-header">
+      <h1>{resume.name}</h1>
+      <p>{resume.headline}</p>
+      {contactRows.length > 0 && <div>{contactRows.map((row, rowIndex) => <p className="reference-contact-row" key={rowIndex}>{row.map((line, index) => <span key={index}>{line}</span>)}</p>)}</div>}
+    </header>
+    <main>
+      {resume.sections.map((section) => {
+        if (!resume.skillGroupHeading || !skillSections.includes(section)) return renderSection(section);
+        if (section !== skillSections[0]) return null;
+        return <section className="reference-section reference-skills-group" key="skills-group">
+          <h2>{resume.skillGroupHeading}</h2>
+          {skillSections.map(section => renderSection(section, true))}
+        </section>;
+      })}
     </main>
   </article>;
 }
@@ -64,12 +76,17 @@ export default function ResumeImprovementPlan({ result, originalResumeText, jobD
   [result, originalResumeText, language]);
   const [answers, setAnswers] = useState<Record<string, { roleIndex: string; text: string; confirmed: boolean; discarded?: boolean }>>({});
   const confirmedProposals = useMemo<ConfirmedEvidence[]>(() => proposals
-    .map((proposal) => confirmResumeEvidence(proposal, answers[proposal.id] ?? {}))
+    .map((proposal) => confirmResumeEvidence(proposal, answers[proposal.id] ? { ...answers[proposal.id], confirmed: !answers[proposal.id].discarded } : { text: proposal.draftText, roleIndex: proposal.roleIndex, confirmed: true }))
     .filter((proposal): proposal is ConfirmedEvidence => Boolean(proposal)), [proposals, answers]);
+  const eligibility = useMemo<EligibilityItem[]>(() => result.eligibilityChecks ?? [], [result]);
+  const [eligibilityAnswers, setEligibilityAnswers] = useState<Record<string, { text: string; confirmed: boolean; discarded?: boolean }>>({});
+  const confirmedEligibility = useMemo<ConfirmedEligibility[]>(() => eligibility.filter((item) => item.status !== "matched")
+    .map((item) => confirmEligibilityEvidence(item, eligibilityAnswers[item.id] ? { ...eligibilityAnswers[item.id], confirmed: !eligibilityAnswers[item.id].discarded } : { text: item.draftText ?? item.label, confirmed: true }))
+    .filter((item): item is ConfirmedEligibility => Boolean(item)), [eligibility, eligibilityAnswers]);
   const atsResume = useMemo<AdaptedDocument>(() => buildAtsResume(originalResumeText, language, { fileName }), [originalResumeText, language, fileName]);
   const adaptedResume = useMemo<AdaptedDocument>(() =>
-    buildAdaptedResume(originalResumeText, result, targetLabel, language, { fileName, confirmedExperienceSuggestions: confirmedProposals }),
-  [originalResumeText, result, targetLabel, language, fileName, confirmedProposals]);
+    buildAdaptedResume(originalResumeText, result, targetLabel, language, { fileName, confirmedExperienceSuggestions: confirmedProposals, confirmedEligibility }),
+  [originalResumeText, result, targetLabel, language, fileName, confirmedProposals, confirmedEligibility]);
   const adaptedResult = useMemo(() => jobDescription.trim()
     ? analyzeResume(adaptedResume.plainText, jobDescription, language, "vacancy")
     : result,
@@ -77,7 +94,6 @@ export default function ResumeImprovementPlan({ result, originalResumeText, jobD
   const skills = useMemo(() => adaptedSkillPlan(adaptedResult), [adaptedResult]);
   const [printing, setPrinting] = useState<false | "ats" | "adapted">(false);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle");
-  const eligibility = result.eligibilityChecks ?? [];
   const hasTechnicalRequirements = Boolean(skills.supportedTechnical.length + skills.supportedSoft.length + skills.developingTechnical.length + skills.developingSoft.length);
   const requirementsToConfirm = skills.developingTechnical.length + skills.developingSoft.length;
   const pendingProposals = proposals.filter((proposal) => !answers[proposal.id]?.confirmed && !answers[proposal.id]?.discarded).length;
@@ -110,15 +126,15 @@ export default function ResumeImprovementPlan({ result, originalResumeText, jobD
   return <section className="resume-improvement-plan adapted-resume-plan" aria-labelledby="improvement-plan-title">
     <h2 id="improvement-plan-title">{es ? "Tu CV adaptado está listo para esta oferta" : "Your tailored resume is ready for this role"}</h2>
     <p className="automatic-resume-intro">{es
-      ? "Primero ordenamos tu CV en formato ATS conservando su información. Después destacamos lo relevante para la oferta. Para agregar información nueva, indica dónde la realizó el candidato y confirma que corresponde a su experiencia."
-      : "First we organize your resume in ATS format while preserving its information. Then we highlight relevant evidence for the role. New information requires a description of where the candidate applied it and confirmation from the person adapting the resume."}</p>
+      ? "Primero ordenamos tu CV en formato ATS conservando su información. Después destacamos lo relevante para la oferta. Las adiciones basadas en la oferta aparecen listas para revisar. Puedes confirmarlas, editarlas o descartarlas antes de descargar."
+      : "First we organize your resume in ATS format while preserving its information. Then we highlight relevant evidence for the role. Job-based additions are ready to review. You can confirm, edit or discard them before downloading."}</p>
 
     <div className="adapted-score-grid" aria-label={es ? "Comparación de cobertura" : "Coverage comparison"}>
       <section><span>{es ? "Coincidencia respaldada" : "Supported match"}</span><strong>{result.score ?? "—"}{result.score !== null ? "%" : ""}</strong><p>{es ? "Tu CV original, antes de incorporar propuestas." : "Your original resume before confirmed proposals."}</p></section>
-      <section><span>{es ? "CV adaptado confirmado" : "Confirmed tailored resume"}</span><strong>{adaptedResult.score ?? "—"}{adaptedResult.score !== null ? "%" : ""}</strong><p>{es ? "Se recalcula con la versión que descargarás." : "Recalculated from the version you will download."}</p></section>
-      <section><span>{es ? "Requisitos por acreditar" : "Requirements to verify"}</span><strong>{hasTechnicalRequirements ? requirementsToConfirm : "—"}</strong><p>{es ? "No se incluyen en el CV hasta que exista evidencia real." : "They are not included until the resume contains real evidence."}</p></section>
+      <section><span>{es ? "CV adaptado con adiciones" : "Tailored resume with additions"}</span><strong>{adaptedResult.score ?? "—"}{adaptedResult.score !== null ? "%" : ""}</strong><p>{es ? "Se recalcula con la versión que descargarás." : "Recalculated from the version you will download."}</p></section>
+      <section><span>{es ? "Requisitos por acreditar" : "Requirements to verify"}</span><strong>{hasTechnicalRequirements ? requirementsToConfirm : "—"}</strong><p>{es ? "Revisa las adiciones propuestas para estos requisitos." : "Review the proposed additions for these requirements."}</p></section>
     </div>
-    <p className="adapted-score-note">{es ? "El porcentaje no aumenta por repetir palabras: solo cambia cuando el CV contiene evidencia relacionada con cada requisito." : "The percentage does not rise by repeating keywords; it changes only when the resume contains evidence related to each requirement."}</p>
+    <p className="adapted-score-note">{es ? "La coincidencia de la versión adaptada incluye las adiciones propuestas; revisa que describan la experiencia del candidato." : "The tailored match includes proposed additions; review them against the candidate’s experience."}</p>
 
     <section className="adapted-changes" aria-labelledby="adapted-changes-title">
       <h3 id="adapted-changes-title">{es ? "Qué adaptamos" : "What we tailored"}</h3>
@@ -133,39 +149,52 @@ export default function ResumeImprovementPlan({ result, originalResumeText, jobD
     </section>
 
     {proposals.length > 0 && <section className="aggressive-adaptation" aria-labelledby="evidence-title">
-      <header><div><p>{es ? "INFORMACIÓN POR CONFIRMAR" : "INFORMATION TO CONFIRM"}</p><h3 id="evidence-title">{es ? "Experiencia del candidato por confirmar" : "Candidate experience to confirm"}</h3></div></header>
-      <p>{es ? "La oferta sirve para identificar qué consultar. Puedes confirmar la experiencia del candidato al adaptar su CV. Revisa o completa el texto y el empleo correspondiente antes de incluirlo." : "The job description identifies what to ask about. You can confirm the candidate’s experience while adapting their resume. Review or complete the text and corresponding job before including it."}</p>
+      <header><div><p>{es ? "INFORMACIÓN POR CONFIRMAR" : "INFORMATION TO CONFIRM"}</p><h3 id="evidence-title">{es ? "Adiciones propuestas para la oferta" : "Proposed additions for the role"}</h3></div></header>
+      <p>{es ? "Preparamos estas adiciones según la oferta y las incorporamos a la versión adaptada. Revisa el texto y el empleo propuesto; puedes confirmar, editar o descartar cada adición." : "We prepared these additions from the job description and included them in the tailored version. Review the text and suggested job; you can confirm, edit or discard each addition."}</p>
       <div className="aggressive-proposal-list">{proposals.map((proposal) => {
         const answer = answers[proposal.id] ?? { roleIndex: proposal.roleIndex, text: proposal.draftText, confirmed: false };
         const update = (patch: Partial<typeof answer>) => setAnswers((current) => ({ ...current, [proposal.id]: { ...answer, ...patch } }));
         return <article className="aggressive-proposal" key={proposal.id}>
           <h4>{proposal.keyword}</h4>
           <label htmlFor={proposal.id + "-role"}>{es ? "¿En qué empleo lo realizó?" : "In which job did the candidate apply it?"}</label>
-          <select id={proposal.id + "-role"} value={answer.roleIndex} onChange={(event) => update({ roleIndex: event.target.value, confirmed: false })}>
+          <select id={proposal.id + "-role"} value={answer.roleIndex} onChange={(event) => update({ roleIndex: event.target.value, confirmed: false, discarded: false })}>
             <option value="">{es ? "Selecciona un empleo" : "Select a job"}</option>
             {proposal.roles.map((role, index) => <option key={index} value={index}>{role.title} {role.date}</option>)}
           </select>
           <label htmlFor={proposal.id + "-text"}>{es ? "Revisa o describe la actividad realizada" : "Review or describe the activity performed"}</label>
-          <textarea id={proposal.id + "-text"} rows={3} value={answer.text} onChange={(event) => update({ text: event.target.value, confirmed: false })} />
+          <textarea id={proposal.id + "-text"} rows={3} value={answer.text} onChange={(event) => update({ text: event.target.value, confirmed: false, discarded: false })} />
           {!proposal.roles.length && <p>{es ? "Completa tus empleos en el CV original para asociar esta información." : "Add your jobs to the original resume to associate this information."}</p>}
           <div>
-            <button type="button" disabled={answer.roleIndex === "" || answer.text.trim().length < 15} onClick={() => update({ confirmed: true, discarded: false })}>{es ? "Confirmar experiencia e incluir en el CV" : "Confirm experience and add to resume"}</button>
-            <button type="button" onClick={() => update({ confirmed: false, discarded: true })}>{es ? "No corresponde" : "Not applicable"}</button>
+            <button type="button" disabled={answer.roleIndex === "" || answer.text.trim().length < 15} onClick={() => update({ confirmed: true, discarded: false })}>{es ? "Confirmar adición" : "Confirm addition"}</button>
+            <button type="button" onClick={() => update({ confirmed: false, discarded: true })}>{es ? "Descartar adición" : "Discard addition"}</button>
           </div>
-          <span role="status">{answer.confirmed ? (es ? "Agregado al CV" : "Added to resume") : answer.discarded ? (es ? "No se agregará" : "Will not be added") : (es ? "Sin agregar" : "Not added")}</span>
+          <span role="status">{answer.confirmed ? (es ? "Adición confirmada" : "Addition confirmed") : answer.discarded ? (es ? "No se agregará" : "Will not be added") : (es ? "Adición propuesta incluida" : "Proposed addition included")}</span>
         </article>;
       })}</div>
     </section>}
 
     {eligibility.length > 0 && <section className="offer-eligibility" aria-labelledby="offer-eligibility-title">
-      <h3 id="offer-eligibility-title">{es ? "Requisitos personales por revisar" : "Personal requirements to review"}</h3>
+      <h3 id="offer-eligibility-title">{es ? "Adiciones sobre requisitos personales" : "Personal requirement additions"}</h3>
       <p>{es ? "Idiomas, estudios, residencia y años de experiencia se mantienen separados porque no pueden completarse mediante palabras clave." : "Languages, education, residence and years of experience stay separate because keywords cannot complete them."}</p>
-      <ul>{eligibility.map((item) => <li key={item.id}>
+      <p>{es ? "El sistema prepara las adiciones usando la oferta y las fechas del CV. Solo revisa qué se está agregando: puedes confirmar, editar o descartar." : "The system prepares additions using the role and employment dates. Review what is being added: you can confirm, edit or discard."}</p>
+      <ul>{eligibility.map((item) => {
+        const answer = eligibilityAnswers[item.id];
+        const text = answer?.text ?? item.draftText ?? item.label;
+        const confirmed = Boolean(answer?.confirmed);
+        return <li key={item.id}>
         <div><strong>{item.label}</strong><span>{item.evidence}</span></div>
-        <span className={`offer-eligibility-status ${item.status}`}>
-          {item.status === "matched" ? (es ? "Detectado" : "Found") : item.status === "missing" ? (es ? "No acreditado" : "Not shown") : (es ? "Confirmar" : "Confirm")}
+        <span className={`offer-eligibility-status ${confirmed ? "matched" : item.status}`}>
+          {confirmed ? (es ? "Adición confirmada" : "Addition confirmed") : item.status === "matched" ? (es ? "Detectado" : "Found") : item.status === "missing" ? (es ? "No encontrado en original" : "Not found in original") : (es ? "Revisar adición" : "Review addition")}
         </span>
-      </li>)}</ul>
+        {item.status !== "matched" && <div className="eligibility-confirmation">
+          <label htmlFor={item.id + "-confirmation"}>{es ? "Adición propuesta para el CV" : "Proposed resume addition"}</label>
+          <textarea id={item.id + "-confirmation"} rows={2} value={text} onChange={(event) => setEligibilityAnswers((current) => ({ ...current, [item.id]: { text: event.target.value, confirmed: false, discarded: false } }))} />
+          <button type="button" disabled={!text.trim()} onClick={() => setEligibilityAnswers((current) => ({ ...current, [item.id]: { text, confirmed: !confirmed, discarded: false } }))}>{confirmed ? (es ? "Volver a propuesta" : "Return to proposal") : (es ? "Confirmar adición" : "Confirm addition")}</button>
+          <button type="button" onClick={() => setEligibilityAnswers((current) => ({ ...current, [item.id]: { text, confirmed: false, discarded: true } }))}>{es ? "Descartar adición" : "Discard addition"}</button>
+          <span role="status">{answer?.discarded ? (es ? "No se agregará" : "Will not be added") : confirmed ? (es ? "Adición confirmada" : "Addition confirmed") : item.status !== "matched" ? (es ? "Adición propuesta incluida" : "Proposed addition included") : ""}</span>
+        </div>}
+      </li>;
+      })}</ul>
     </section>}
 
     <div className="resume-export-actions" aria-label={es ? "Descargar CV adaptado" : "Download tailored resume"}>
@@ -174,8 +203,8 @@ export default function ResumeImprovementPlan({ result, originalResumeText, jobD
       <button type="button" onClick={() => void copyResume()}>{copyStatus === "copied" ? (es ? "Copiado ✓" : "Copied ✓") : (es ? "Copiar CV adaptado" : "Copy tailored resume")}</button>
     </div>
     <p className="resume-export-note">{es
-      ? `La descarga conserva tus datos, empresas, cargos y experiencia original. Además, incorpora ${confirmedProposals.length} ${confirmedProposals.length === 1 ? "propuesta confirmada" : "propuestas confirmadas"}.${pendingProposals ? ` Quedan ${pendingProposals} por revisar.` : ""}`
-      : `The download keeps your original details, employers, roles and experience. It also includes ${confirmedProposals.length} confirmed ${confirmedProposals.length === 1 ? "proposal" : "proposals"}.${pendingProposals ? ` ${pendingProposals} still need review.` : ""}`}</p>
+      ? `La descarga conserva tus datos, empresas, cargos y experiencia original. Además, incorpora ${confirmedProposals.length + confirmedEligibility.length} ${confirmedProposals.length + confirmedEligibility.length === 1 ? "adición" : "adiciones"}.${pendingProposals ? ` Quedan ${pendingProposals} por revisar.` : ""}`
+      : `The download keeps your original details, employers, roles and experience. It also includes ${confirmedProposals.length + confirmedEligibility.length} proposed ${confirmedProposals.length + confirmedEligibility.length === 1 ? "proposal" : "proposals"}.${pendingProposals ? ` ${pendingProposals} still need review.` : ""}`}</p>
     {copyStatus === "error" && <p className="resume-copy-status" role="status">{es ? "No se pudo copiar. Puedes descargar el PDF." : "Could not copy. You can download the PDF."}</p>}
     {printing && createPortal(<ReferenceResumeDocument resume={printing === "ats" ? atsResume : adaptedResume} language={language} />, document.body)}
   </section>;
