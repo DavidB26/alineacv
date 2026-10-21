@@ -50,7 +50,7 @@ test('preserves soft skills visibly as a separate section in both exports',()=>{
 test('prepares editable drafts for gaps without requiring the operator to write them',()=>{
  const result=analyzeResume(cv,'Se requiere ArcGIS y MODFLOW.');
  const questions=missingEvidenceQuestions(result,cv);
- assert.equal(questions.length,2);assert.ok(questions.every(q=>q.draftText.length>15 && q.roleIndex!==''));
+ assert.deepEqual(new Set(questions.flatMap(q=>q.coveredKeywords)),new Set(["ArcGIS","MODFLOW"]));assert.ok(questions.every(q=>q.draftText.length>15 && q.roleIndex!==''));
 });
 test('adds selected personal requirement proposals without replacing the source or affecting ATS-only export',()=>{
  const result=analyzeResume(cv,job);

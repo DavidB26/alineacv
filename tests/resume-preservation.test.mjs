@@ -80,7 +80,7 @@ test('preserves employers, roles, exact original bullet wording, months, educati
 
 test('requires operator confirmation, an actual job and editable evidence before adding a missing requirement', () => {
   const result = analyzeResume(source, vacancy);
-  const question = missingEvidenceQuestions(result, source).find(q => q.keyword === 'ArcGIS');
+  const question = missingEvidenceQuestions(result, source).find(q => q.coveredKeywords.includes('ArcGIS'));
   assert.ok(question);
   for (const answer of [{}, { confirmed: true, roleIndex: '', text: 'Supervisó mapas con ArcGIS.' }, { confirmed: true, roleIndex: '99', text: 'Supervisó mapas con ArcGIS.' }, { confirmed: true, roleIndex: '0', text: '' }]) assert.equal(confirmResumeEvidence(question, answer), null);
   const confirmed = confirmResumeEvidence(question, { confirmed: true, roleIndex: '1', text: 'Preparó mapas de monitoreo con ArcGIS.' });

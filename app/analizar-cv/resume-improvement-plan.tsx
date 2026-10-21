@@ -10,7 +10,7 @@ type ResumeBlock =
   | { type: "entry"; title: string; date: string; meta: string[]; bullets: string[] }
   | { type: "row"; label: string; value: string }
   | { type: "paragraph"; text: string };
-type EvidenceQuestion = { id: string; keyword: string; roles: Array<{ title: string; date: string }>; roleIndex: string; draftText: string };
+type EvidenceQuestion = { id: string; keyword: string; coveredKeywords: string[]; roles: Array<{ title: string; date: string }>; roleIndex: string; draftText: string };
 type EligibilityItem = { id: string; label: string; evidence: string; status: string; draftText?: string };
 type ConfirmedEligibility = { id: string; confirmed: boolean; text: string };
 type ConfirmedEvidence = { id: string; included: boolean; roleTitle: string; roleDate: string; coveredKeywords: string[]; bullets: string[] };
