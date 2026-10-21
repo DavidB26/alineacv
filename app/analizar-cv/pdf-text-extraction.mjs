@@ -10,7 +10,7 @@ const HEADING_TYPES = new Map([
   ["lenguaje", "languages"], ["lenguajes", "languages"], ["idioma", "languages"], ["idiomas", "languages"], ["languages", "languages"],
   ["hobbies", "interests"], ["intereses", "interests"], ["interests", "interests"],
   ["educacion", "education"], ["formacion academica", "education"], ["education", "education"],
-  ["certificaciones", "certifications"], ["cursos", "certifications"], ["certifications", "certifications"],
+  ["formacion profesional complementaria", "certifications"], ["formacion complementaria", "certifications"], ["software y herramientas", "skills"], ["competencias tecnicas", "skills"], ["habilidades blandas", "skills"], ["certificaciones", "certifications"], ["cursos", "certifications"], ["certifications", "certifications"],
   ["algunos trabajos mios", "projects"], ["proyectos", "projects"], ["proyectos relevantes", "projects"], ["projects", "projects"],
 ]);
 
@@ -27,6 +27,7 @@ function atomFromItem(item) {
     x: Number(item.transform?.[4] ?? 0),
     y: Number(item.transform?.[5] ?? 0),
     width: Number(item.width ?? 0),
+    height: Math.abs(Number(item.transform?.[0] ?? 10)),
   };
 }
 
@@ -43,7 +44,15 @@ function groupRows(atoms, tolerance = 3.5) {
   }
   return rows
     .sort((a, b) => b.y - a.y)
-    .map((row) => row.atoms.sort((a, b) => a.x - b.x).map((atom) => atom.text).join(" ").replace(/\s+/g, " ").trim())
+    .map((row) => {
+      const sorted = row.atoms.sort((a, b) => a.x - b.x);
+      return sorted.reduce((text, atom, index) => {
+        const previous = sorted[index - 1];
+        const gap = previous ? atom.x - previous.x - previous.width : Infinity;
+        const joinedWord = previous?.width > 0 && gap >= -0.5 && gap < Math.min(previous.height, atom.height) * 0.18;
+        return text + (index && !joinedWord ? " " : "") + atom.text;
+      }, "").replace(/\s+/g, " ").trim();
+    })
     .filter(Boolean);
 }
 
@@ -173,7 +182,13 @@ export function extractPdfPageText(items, viewportWidth = 595, operatorItems = [
   if (!atoms.length) return "";
   const headings = atoms
     .map((atom) => ({ atom, x: atom.x, y: atom.y, text: atom.text, type: HEADING_TYPES.get(normalize(atom.text)) }))
-    .filter((heading) => heading.type);
+    .filter((heading) => heading.type && !atoms.some((other) => {
+      if (other === heading.atom || Math.abs(other.y - heading.y) > 3.5) return false;
+      const gap = other.x < heading.x ? heading.x - other.x - other.width : other.x - heading.x - heading.atom.width;
+      // A matching word inside a sentence is not a section heading. Separate
+      // columns can have headings on the same baseline, with a wide gutter.
+      return gap < 45 && !HEADING_TYPES.has(normalize(other.text));
+    }));
   const boundary = columnBoundary(headings, viewportWidth);
   const leftHeadings = headings.filter((heading) => heading.x < boundary);
   const rightHeadings = headings.filter((heading) => heading.x >= boundary);

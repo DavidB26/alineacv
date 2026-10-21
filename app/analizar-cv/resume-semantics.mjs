@@ -1,3 +1,5 @@
+import { reorganizeResume } from "./resume-improvements.mjs";
+import { normalizeResumeDates } from "./resume-dates.mjs";
 function plain(value) {
   return String(value ?? "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
@@ -103,12 +105,16 @@ export function extractResumeContacts(sourceText) {
   const sourceLines = sourceText.split(/\r?\n/).map(clean);
   const phones = sourceLines.flatMap((line) => [...line.matchAll(/(?:\+?\d[\d \t().-]{7,}\d)/g)].map((match) => clean(match[0])))
     .filter((value) => value.replace(/\D/g, "").length >= 9 && !/^(?:19|20)\d{2}\s*[-–—]/.test(value));
-  const locations = sourceLines.flatMap((line) => line.split(/[|•]/).map(clean)).filter((line) => {
+  const parsed = reorganizeResume(sourceText);
+  const locationLines = [...parsed.header, ...parsed.sections.filter((section) => section.kind === "contact").flatMap((section) => section.lines)];
+  const locations = locationLines.flatMap((line) => line.split(/[|•·]/).map(clean)).filter((line) => {
     if (!/^[\p{L} .'-]{2,35},\s*[\p{L} .'-]{2,35}$/u.test(line) || PROFESSION.test(line)) return false;
     const parts = line.split(",").map((part) => part.trim().split(/\s+/).length);
     return line.length <= 45 && parts[0] <= 3 && parts[1] <= 3;
   });
-  return unique([...phones, ...emails, ...locations, ...urls]);
+  const credentials = sourceLines.flatMap((line) => line.split(/[|•·]/).map(clean))
+    .filter((line) => /^(?:CIP|colegiatura|registro profesional|licencia de conducir)\b/i.test(line));
+  return unique([...phones.map((phone) => phone.replace(/^(\+\d+)\)/, "($1)")), ...emails, ...locations, ...urls, ...credentials]);
 }
 
 export function recoverProfileText(profileLines, header, name, headline) {
@@ -122,12 +128,13 @@ export function recoverProfileText(profileLines, header, name, headline) {
     && plain(line) !== plain(headline)
     && !GENERIC_LABEL.test(line)
     && !CONTACT_LIKE.test(line)
+    && !/^(?:tel[eé]fono|licencia de conducir|[· ]*CIP|colegiatura)\b/i.test(line)
     && !/^hola[,!]?$/i.test(line));
   return candidates.join(" ").replace(/^soy\s+[\p{Lu}][\p{L}.'-]+[!.]?\s*/u, "").trim();
 }
 
 export function dateParts(value) {
-  const text = clean(value);
+  const text = normalizeResumeDates(clean(value));
   const match = text.match(DATE_PATTERN);
   if (!match) return null;
   return {
@@ -212,8 +219,7 @@ export function recoverExperienceBlocks(lines, polish) {
 }
 
 export function recoverEducationBlocks(lines) {
-  if (lines.some((line) => /^(?:[-•*▪‣]|\(cid:\d+\))\s*/.test(line))) return null;
-  const source = lines.map(clean).filter((line) => line && !CONTACT_LIKE.test(line));
+  const source = lines.map((line) => clean(line).replace(/^(?:[-•*▪‣]|\(cid:\d+\))\s*/, "")).filter((line) => line && !CONTACT_LIKE.test(line));
   const entries = [];
   let pending = [];
   let current = null;
@@ -263,7 +269,7 @@ export function skillBlocks(lines, language = "es") {
   const grouped = new Map();
   const tools = [];
   const competencies = [];
-  for (const original of lines.map(clean).filter(Boolean)) {
+  for (const original of lines.flatMap((line) => line.split(/\s*[•▪‣]\s*/)).map(clean).filter(Boolean)) {
     if (CONTACT_LIKE.test(original) || /^(?:tel[eé]fono|email|behance porta)$/i.test(original)) continue;
     const segments = original.split("|").map(clean).filter(Boolean);
     let activeLabel = "";

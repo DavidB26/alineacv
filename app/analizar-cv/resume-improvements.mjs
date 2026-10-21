@@ -16,10 +16,10 @@ const sectionNames = [
   ["specializations", /^(areas? de especializacion|especialidades|areas? de practica|areas? of expertise|specializations?|expertise)$/i],
   ["experience", /^(experiencia(?: profesional| laboral)?|trayectoria profesional|professional experience|work experience|employment|work history)(?:\s*[-–—]\s*(?:continuacion|continuación|continued))?$/i],
   ["education", /^(educacion|formacion(?: academica)?|estudios|education|academic background)$/i],
-  ["skills", /^(habilidades(?: tecnicas)?|competencias(?: tecnicas)?|tecnologias|software(?: skills?)?|technical skills|skills|competencies|tools)$/i],
+  ["skills", /^(habilidades(?: tecnicas| blandas)?|competencias(?: tecnicas)?|tecnologias|software(?: skills?| y herramientas)?|technical skills|skills|competencies|tools)$/i],
   ["projects", /^(proyectos(?: personales| independientes| destacados| adicionales| relevantes)?|proyectos y evidencia relevante|algunos trabajos mios|projects|independent projects|additional projects|relevant projects|relevant projects and evidence)$/i],
   ["training", /^(formacion y habilidades en desarrollo|habilidades en desarrollo|training and developing skills)$/i],
-  ["certifications", /^(certificaciones|cursos(?: y certificaciones)?(?: en linea| en línea)?|formacion complementaria|certifications|courses|additional training)$/i],
+  ["certifications", /^(certificaciones|cursos(?: y certificaciones)?(?: en linea| en línea)?|formacion(?: profesional)? complementaria|certifications|courses|additional training)$/i],
   ["languages", /^(idiomas?|lenguajes?|languages?)$/i],
   ["interests", /^(intereses|hobbies|interests)$/i],
   ["contact", /^(contacto|contact)$/i],
@@ -52,12 +52,16 @@ export function repairWrappedResumeLines(sourceText) {
       && /^[A-ZÁÉÍÓÚÑ0-9/&+.-]+$/.test(line)
       && /(?:\b(?:a|al|de|del|en|para|por|con|y|e|u|o)|[,;:])\s*$/i.test(repaired[activeBullet]);
     const projectTitle = /^(?:proyecto|project)\s*:\s*/i.test(line);
+    const achievementHeading = /^(?:logros|achievements)$/i.test(line);
+    const separateHeading = activeBullet >= 0 && /(?:[.!?]|(?:19|20)\d{2})$/.test(repaired[activeBullet])
+      && line.length < 100 && /^[\p{Lu}]/u.test(line) && !/[.!?,;:]$/.test(line)
+      && !/^(?:de|del|con|para|en|y|e|mediante|durante)\b/i.test(line);
     const entryHeading = line.length < 190 && /^[A-ZÁÉÍÓÚÑ]/.test(line) && /[|·]/.test(line);
 
     if (bullet) {
       repaired.push(line);
       activeBullet = repaired.length - 1;
-    } else if (activeBullet >= 0 && !section && !datedHeading && !contact && (!uppercaseHeading || acronymContinuation) && !projectTitle && !entryHeading) {
+    } else if (activeBullet >= 0 && !section && !datedHeading && !contact && (!uppercaseHeading || acronymContinuation) && !projectTitle && !entryHeading && !achievementHeading && !separateHeading) {
       repaired[activeBullet] += " " + line;
     } else {
       repaired.push(line);

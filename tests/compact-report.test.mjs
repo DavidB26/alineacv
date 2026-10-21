@@ -134,7 +134,9 @@ test("adapts the resume while separating supported and unverified skills", () =>
   assert.match(html, /Docker/);
   assert.doesNotMatch(html, /Proyecto independiente|Proyecto completo recomendado|Qué debe incluir|Versión breve que irá al CV/);
   assert.doesNotMatch(html, /Usar este borrador|Confirmo que puedo respaldarlo e incluirlo|Versión guardada/);
-  assert.doesNotMatch(html, /<textarea/);
+  assert.match(html, /<textarea/);
+  assert.match(html, /Confirmar experiencia e incluir en el CV/);
+  assert.match(html, /Descargar solo formato ATS/);
   assert.match(html, /Palabras clave de la vacante/);
   assert.match(html, /class="matched" aria-label="React: Encontradas"/);
   assert.match(html, /class="missing" aria-label="Docker: No encontradas"/);

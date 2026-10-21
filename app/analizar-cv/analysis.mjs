@@ -149,6 +149,25 @@ const REQUIREMENT_GROUPS = [
   ["Investigación jurídica", ["investigacion juridica", "legal research"]],
   ["Redacción jurídica", ["redaccion juridica", "legal writing"]],
   ["Debida diligencia", ["debida diligencia", "due diligence"]],
+  ["Hidrogeología minera", ["hidrogeologia aplicada a mineria", "hidrogeologia aplicada a la mineria", "hidrogeologia minera", "hidrogeologia aplicada a operaciones mineras"]],
+  ["Pit Dewatering", ["pit dewatering", "desaguado de tajos", "desaguado en minas a tajo abierto"]],
+  ["Pruebas hidráulicas", ["pruebas hidraulicas", "pruebas de bombeo", "slug test", "slug tests", "pumping test"]],
+  ["Perforaciones hidrogeológicas y geotécnicas", ["perforacion hidrogeologica", "perforacion hidrogeologica y geotecnica", "perforaciones hidrogeologicas", "perforaciones hidrogeologicas y geotecnicas"]],
+  ["Instrumentación hidrogeológica", ["instrumentacion hidrogeologica", "piezometros"]],
+  ["Monitoreo hidrogeológico", ["monitoreo hidrogeologico", "monitoreo de aguas subterraneas", "monitorear niveles de aguas subterraneas"]],
+  ["Drenaje y bombeo", ["drenaje", "bombeo", "bombeos"]],
+  ["Modelamiento hidrogeológico", ["modelamiento hidrogeologico", "modelos hidrogeologicos"]],
+  ["Balances hídricos", ["balances hidricos", "balance hidrico"]],
+  ["Gestión de SSEE", ["gestion de ssee", "estandares operativos de ssee", "seguridad, medio ambiente de ssee"]],
+  ["Microsoft Office", ["microsoft office", "microsoft office:"]],
+  ["ArcGIS", ["arcgis"]],
+  ["Autodesk Civil 3D", ["autodesk civil 3d", "civil 3d"]],
+  ["FEFLOW", ["feflow"]],
+  ["MODFLOW", ["modflow"]],
+  ["Leapfrog", ["leapfrog", "leafrog"]],
+  ["Slide2", ["slide2"]],
+  ["SEEP/W", ["seep/w", "seep / w"]],
+  ["HGA", ["hga"]],
   ["AutoCAD", ["autocad"]],
   ["Revit", ["revit"]],
   ["BIM", ["bim", "building information modeling"]],
@@ -366,7 +385,7 @@ export function resumeSearchSkills(value) {
 }
 
 function keywordList(value) {
-  const normalizedValue = normalize(value);
+  const normalizedValue = normalize(value).replace(/\bcampanas?\s+de\s+perforacion\b/g, "programas de perforacion");
   let requirements = REQUIREMENT_GROUPS
     .filter(([, aliases]) => aliases.some((alias) => hasTerm(normalizedValue, alias)))
     .map(([label, aliases]) => ({ label, aliases, projectable: !NON_PROJECT_REQUIREMENTS.has(label) }));
@@ -407,10 +426,10 @@ function keywordList(value) {
     "ia",
   ]);
   const acronyms = Array.from(new Set(value.match(/\b[A-Z][A-Z0-9]{1,9}\b/g) ?? []))
-    .filter((token) => !STOP_WORDS.has(normalize(token)) && !knownAliases.has(normalize(token)))
+    .filter((token) => !STOP_WORDS.has(normalize(token)) && !knownAliases.has(normalize(token)) && !/^(?:A[12](?:B)?|SEEP|SSEE|CIP)$/.test(token))
     .map((token) => ({ label: token, aliases: [token] }));
 
-  return [...requirements, ...acronyms].slice(0, 18);
+  return [...requirements, ...acronyms];
 }
 
 const LANGUAGE_LEVEL = new Map([
@@ -495,6 +514,17 @@ function eligibilityChecks(jobDescription, resumeText, language) {
       evidence: found
         ? localized(language, "El CV incluye al menos un enlace profesional para revisión.", "The resume includes at least one professional link for review.")
         : localized(language, "Añade un enlace directo a trabajos que puedas demostrar.", "Add a direct link to work you can demonstrate."),
+    });
+  }
+  const license = job.match(/licencia de conducir\s*([ab]\s*[- ]?\s*\d(?:\s*[abc])?)/i);
+  if (license) {
+    const declared = resume.match(/licencia de conducir\s*([ab]\s*[- ]?\s*\d(?:\s*[abc])?)/i);
+    checks.push({
+      id: "eligibility-driving", label: localized(language, "Licencia de conducir " + license[1].toUpperCase(), "Driving license " + license[1].toUpperCase()),
+      status: "review",
+      evidence: declared
+        ? localized(language, "El CV declara " + declared[1].toUpperCase() + ". Verifica vigencia, categoría y experiencia de manejo en mina.", "The resume states " + declared[1].toUpperCase() + ". Verify validity, category and mine driving experience.")
+        : localized(language, "Confirma la licencia y la experiencia de manejo; no se añaden como una habilidad.", "Confirm the license and driving experience; these are not added as a skill."),
     });
   }
   return checks;

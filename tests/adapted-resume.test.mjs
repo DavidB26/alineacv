@@ -82,7 +82,7 @@ test("generates offer-specific projects and includes them in the complete adapte
   const document = buildAdaptedResume(completeText, result, "Abogada corporativa", "es");
   assert.equal(result.score, originalScore);
   assert.match(document.plainText, /Andrea Salazar/);
-  assert.match(document.plainText, /Revisar contratos y preparé expedientes/);
+  assert.match(document.plainText, /Revisé contratos y preparé expedientes/);
   assert.match(document.plainText, /PROYECTOS RELEVANTES/);
   for (const project of projects) assert.match(document.plainText, new RegExp(project.title, "i"));
 });
@@ -96,7 +96,7 @@ test("builds the one-column reference structure without truncating source bullet
   assert.deepEqual(adapted.sections.slice(0, 3).map((section) => section.kind), ["profile", "experience", "skills"]);
   assert.match(adapted.plainText, /PERFIL PROFESIONAL/);
   assert.doesNotMatch(adapted.plainText, /ÁREAS DE ESPECIALIZACIÓN/);
-  assert.match(adapted.plainText, /Revisar contratos y preparé expedientes para el equipo legal mediante coordinación interna\./);
+  assert.match(adapted.plainText, /Revisé contratos y preparé expedientes para el equipo legal mediante coordinación interna,/);
   assert.doesNotMatch(adapted.plainText, /mediante\s*$/m);
   assert.doesNotMatch(adapted.plainText, /\.\.\./);
 });
@@ -481,8 +481,8 @@ test("reconstructs a graphic Adobe resume instead of exporting its visual readin
   assert.equal(document.headline, "Diseñadora gráfica");
   assert.deepEqual(document.contactLines.slice(0, 3), ["+51 912 317 162", "gen.nith123@gmail.com", "Lima, Perú"]);
   assert.match(document.plainText, /PERFIL PROFESIONAL[\s\S]*construir mi identidad profesional\./);
-  assert.match(document.plainText, /Diseño Web \(Tottus\) \| 2023[\s\S]*Realizar el mantenimiento/);
-  assert.match(document.plainText, /Diseñadora Gráfica \(Lingo\) \| 2025[\s\S]*Realizar piezas gráficas/);
+  assert.match(document.plainText, /Diseño Web \(Tottus\) \| 2023[\s\S]*Encargada de realizar el mantenimiento/);
+  assert.match(document.plainText, /Diseñadora Gráfica \(Lingo\) \| 2025[\s\S]*Encargada de realizar piezas gráficas/);
   assert.match(document.plainText, /Packaging \| Ilustración \| Branding/);
   assert.match(document.plainText, /Herramientas: Adobe XD \| Adobe Photoshop \| Adobe Illustrator \| Adobe InDesign \| Figma \| Procreate/);
   assert.match(document.plainText, /Inglés: Intermedio[\s\S]*Español: Nativo/);

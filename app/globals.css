@@ -817,7 +817,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .reference-resume p { margin: 0 0 1.2mm; white-space: normal; orphans: 3; widows: 3; }
   .reference-section { margin-top: 3.6mm; }
   .reference-section h2 { margin: 0 0 2.1mm; padding-bottom: .8mm; border-bottom: .7px solid #222; font-size: 10.5pt; line-height: 1.2; letter-spacing: .035em; break-after: avoid; }
-  .reference-entry { margin-bottom: 2.3mm; break-inside: avoid; }
+  .reference-entry { margin-bottom: 2.3mm; break-inside: auto; }
   .reference-entry > header { display: flex; align-items: baseline; justify-content: space-between; gap: 5mm; margin-bottom: .7mm; break-after: avoid; }
   .reference-entry > header strong { font-size: 9.7pt; }
   .reference-entry > header time { flex: 0 0 auto; font-size: 8.7pt; font-weight: 700; }
@@ -829,7 +829,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .reference-section-specializations p { line-height: 1.5; }
   .reference-section-projects .reference-entry { margin-bottom: 3mm; }
   .reference-section-projects .reference-entry > header strong { font-size: 9.4pt; }
-  .reference-section-projects, .reference-section-skills, .reference-section-certifications, .reference-section-education, .reference-section-languages { break-inside: avoid; }
+  .reference-section-projects, .reference-section-skills, .reference-section-certifications, .reference-section-education, .reference-section-languages { break-inside: auto; }
   @page ats-resume { size: A4; margin: 12mm 18mm 14mm; }
 }
 
@@ -1172,3 +1172,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 @media (max-width: 580px) {
   .ats-target-fields { grid-template-columns: 1fr; }
 }
+
+.aggressive-proposal > label { display: block; margin: 12px 0 5px; font-size: .8rem; font-weight: 700; }
+.aggressive-proposal > select, .aggressive-proposal > textarea { display: block; width: 100%; min-width: 0; padding: 10px; border: 1px solid #b8c9c1; border-radius: 8px; background: #fff; color: #263b4a; font: inherit; font-size: .85rem; }
+.aggressive-proposal > textarea { resize: vertical; }
+.aggressive-proposal > div { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.aggressive-proposal button:disabled { cursor: default; opacity: .5; }
+.aggressive-proposal > [role="status"] { display: block; margin-top: 8px; font-size: .8rem; }

@@ -1,3 +1,4 @@
+import { normalizeResumeDates } from "./resume-dates.mjs";
 import { reorganizeResume } from "./resume-improvements.mjs";
 import {
   extractResumeContacts,
@@ -499,27 +500,7 @@ export function polishResumeBullet(value, language = "es") {
   return text;
 }
 
-const MONTHS = new Map([
-  ["ene", "01"], ["enero", "01"], ["jan", "01"], ["january", "01"],
-  ["feb", "02"], ["febrero", "02"], ["february", "02"],
-  ["mar", "03"], ["marzo", "03"], ["march", "03"],
-  ["abr", "04"], ["abril", "04"], ["apr", "04"], ["april", "04"],
-  ["may", "05"], ["mayo", "05"],
-  ["jun", "06"], ["junio", "06"], ["june", "06"],
-  ["jul", "07"], ["julio", "07"], ["july", "07"],
-  ["ago", "08"], ["agosto", "08"], ["aug", "08"], ["august", "08"],
-  ["sep", "09"], ["sept", "09"], ["septiembre", "09"], ["september", "09"],
-  ["oct", "10"], ["octubre", "10"], ["october", "10"],
-  ["nov", "11"], ["noviembre", "11"], ["november", "11"],
-  ["dic", "12"], ["diciembre", "12"], ["dec", "12"], ["december", "12"],
-]);
-
-export function normalizeResumeDates(value) {
-  return String(value ?? "").replace(/\b([A-Za-zÁÉÍÓÚáéíóú]{3,10})[.\s]+((?:19|20)\d{2})\b/g, (match, month, year) => {
-    const number = MONTHS.get(normalize(month));
-    return number ? number + "/" + year : match;
-  });
-}
+export { normalizeResumeDates } from "./resume-dates.mjs";
 
 export function splitResumeEntry(value) {
   const line = normalizeResumeDates(String(value ?? "").replace(/\s+/g, " ").trim());
@@ -542,14 +523,14 @@ function lineScore(line, keywords) {
   return keywordScore + evidenceScore;
 }
 
-function prioritizeSectionLines(lines, keywords, language) {
+function prioritizeSectionLines(lines, keywords) {
   const output = [];
   let group = null;
   const flush = () => {
     if (!group) return;
     output.push(...group.headers);
     output.push(...group.bullets
-      .map((line, index) => ({ line: "• " + polishResumeBullet(line, language), index, score: lineScore(line, keywords) }))
+      .map((line, index) => ({ line: "• " + preserveResumeBullet(line), index, score: lineScore(line, keywords) }))
       .sort((a, b) => b.score - a.score || a.index - b.index)
       .map((item) => item.line));
   };
@@ -589,20 +570,30 @@ function originalHeadline(header) {
     !/@|https?:\/\/|linkedin|portfolio|portafolio|\+?\d[\d\s().-]{7,}\d/i.test(line)) ?? "";
 }
 
-function entryBlocks(lines, language) {
+function preserveResumeBullet(value) {
+  return String(value ?? "").replace(/^(?:[-•*▪‣]|\(cid:\d+\))\s*/, "").replace(/\s+/g, " ").trim();
+}
+
+function entryBlocks(lines) {
   const entries = [];
   let current = null;
   const push = () => {
     if (current && (current.title || current.meta.length || current.bullets.length)) entries.push(current);
   };
+  let achievementLabel = "";
   for (const line of lines) {
+    if (/^(?:logros|achievements)$/i.test(line)) { achievementLabel = line; continue; }
     if (isBullet(line)) {
       if (!current) current = { type: "entry", title: "", date: "", meta: [], bullets: [] };
-      current.bullets.push(polishResumeBullet(line, language));
+      current.bullets.push((achievementLabel ? achievementLabel + ": " : "") + preserveResumeBullet(line));
+      achievementLabel = "";
       continue;
     }
+    achievementLabel = "";
     const split = splitResumeEntry(line.replace(/^(?:proyecto|project)\s*:\s*/i, ""));
-    if (!current || split.date || current.bullets.length) {
+    if (current && split.date && !split.title && !current.date && !current.bullets.length) {
+      current.date = split.date;
+    } else if (!current || split.date || current.bullets.length) {
       push();
       current = { type: "entry", title: split.title, date: split.date, meta: [], bullets: [] };
     } else current.meta.push(split.title);
@@ -615,7 +606,7 @@ function sectionBlocks(kind, lines, language) {
   if (kind === "experience" || kind === "projects" || kind === "education" || kind === "training") {
     return entryBlocks(lines, language);
   }
-  if (kind === "certifications") return [{ type: "paragraph", text: lines.join(" ").replace(/^[-•*▪‣]\s*/, "") }];
+  if (kind === "certifications") return lines.map((line) => ({ type: "paragraph", text: preserveResumeBullet(line) }));
   if (kind === "skills" || kind === "specializations" || kind === "languages") {
     return lines.map((line) => {
       const separator = line.indexOf(":");
@@ -689,8 +680,6 @@ function adaptProfile(profile, plan) {
       score: keywords.reduce((total, keyword) => total + (normalize(sentence).includes(keyword) ? 1 : 0), 0),
     }))
     .sort((left, right) => right.score - left.score || left.index - right.index)
-    .filter(({ score }) => score > 0)
-    .slice(0, 2)
     .map(({ sentence }) => sentence);
   return prioritizedDetails.length ? [introduction, ...prioritizedDetails].join(" ") : base;
 }
@@ -915,7 +904,7 @@ function includeConfirmedExperience(blocks, suggestions, language) {
   return blocks.map((block) => {
     if (block.type !== "entry") return block;
     const additions = included
-      .filter((suggestion) => normalize(suggestion.roleTitle) === normalize(block.title))
+      .filter((suggestion) => normalize(suggestion.roleTitle) === normalize(block.title) && (!suggestion.roleDate || normalize(suggestion.roleDate) === normalize(block.date)))
       .flatMap((suggestion) => suggestion.bullets)
       .map((bullet) => polishResumeBullet(bullet, language));
     return additions.length ? { ...block, bullets: uniqueLines([...block.bullets, ...additions]) } : block;
@@ -981,7 +970,7 @@ export function buildAdaptedResume(sourceText, result, targetLabel, language = "
   const profile = adaptProfile(recoverProfileText(grouped.get("profile") ?? [], parsed.header, name, headline), skillPlan);
   grouped.set("profile", profile ? [profile] : []);
 
-  const recoveredExperience = recoverExperienceBlocks(grouped.get("experience") ?? [], (value) => polishResumeBullet(value, language));
+  const recoveredExperience = recoverExperienceBlocks(grouped.get("experience") ?? [], preserveResumeBullet);
   if (recoveredExperience?.entries.length) {
     grouped.set("experience", []);
     grouped.set("experienceBlocks", recoveredExperience.entries);
@@ -996,7 +985,7 @@ export function buildAdaptedResume(sourceText, result, targetLabel, language = "
   for (const kind of SECTION_ORDER) {
     let lines = grouped.get(kind) ?? [];
     const recoveredBlocks = grouped.get(kind + "Blocks");
-    const generatedSkills = kind === "skills" && !lines.length && (skillPlan.supportedTechnical.length || skillPlan.supportedSoft.length);
+    const generatedSkills = false;
     const generatedTraining = false;
     if (!lines.length && !recoveredBlocks?.length && !generatedSkills && !generatedTraining) continue;
     if (kind === "experience" || kind === "projects") lines = prioritizeSectionLines(lines, matched, language);
@@ -1056,4 +1045,34 @@ export function adaptedVersionId(sourceText, versionName) {
     hash = Math.imul(hash, 16777619);
   }
   return (hash >>> 0).toString(36);
+}
+
+// ATS conversion is independent from the vacancy: no keyword-derived content.
+export function buildAtsResume(sourceText, language = "es", options = {}) {
+  return buildAdaptedResume(sourceText, {}, "", language, { fileName: options.fileName });
+}
+
+export function missingEvidenceQuestions(result, sourceText, language = "es") {
+  const baseline = buildAtsResume(sourceText, language);
+  const roles = (baseline.sections.find((section) => section.kind === "experience")?.blocks ?? [])
+    .filter((block) => block.type === "entry" && block.title)
+    .map((block) => ({ title: block.title, date: block.date }));
+  const drafts = automaticExperienceSuggestions(result, "", sourceText, language);
+  const keywords = result.keywordMatch?.projectMissing ?? result.keywordMatch?.missing ?? [];
+  return uniqueLines(keywords).filter((keyword) => !NON_SKILL_REQUIREMENTS.has(keyword) && !/^A[12](?:B)?$/i.test(keyword))
+    .map((keyword, index) => {
+      const draft = drafts.find((item) => item.coveredKeywords?.includes(keyword));
+      const roleIndex = draft ? roles.findIndex((role) => role.title === draft.roleTitle && role.date === draft.roleDate) : -1;
+      return { id: "evidence-" + index + "-" + normalize(keyword), keyword, roles, roleIndex: roleIndex < 0 ? "" : String(roleIndex), draftText: draft?.coveredKeywords?.length === 1 ? draft.bullets.join(" ") : "" };
+    });
+}
+
+export function confirmResumeEvidence(question, answer) {
+  const role = question.roles[Number(answer.roleIndex)];
+  const text = String(answer.text ?? "").replace(/\s+/g, " ").trim();
+  if (!answer.confirmed || answer.roleIndex === "" || !role || text.length < 15) return null;
+  return {
+    id: question.id, included: true, roleTitle: role.title, roleDate: role.date,
+    coveredKeywords: [question.keyword], bullets: [question.keyword + ": " + text],
+  };
 }
